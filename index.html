@@ -97,6 +97,7 @@ p{margin:0}
 .seg button{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 12px;font-weight:600;min-height:42px}
 .seg button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 /* session */
+.card.ss{border-left:4px solid var(--accent)}
 .ex-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
 .ex-tgt{font-family:var(--display);font-size:20px;white-space:nowrap}
 .hint{font-size:14px;padding:8px 10px;border-radius:8px;background:var(--surface-2)}
@@ -219,11 +220,11 @@ const EX = {
 // item: [exId, sets, lo, hi, startKg, opts]
 const PHASES = {
   1:{label:"Phase 1 · Foundation",days:3,order:["A","B"],sessions:{
-    A:{title:"Session A",sub:"Squat and press",items:[["ssb",3,6,8,40],["dbpress",3,8,12,15],["pullup",3,5,8,null],["hyper",3,8,12,10],["legext",2,10,15,20],["legcurl",2,10,15,17.5],["pallof",2,8,8,null],["splank",2,20,30,null],["carry",3,30,30,30,{optional:true,fromWeek:5}]]},
-    B:{title:"Session B",sub:"Bench and legs",items:[["goblet",3,8,10,20],["bench",3,6,8,60],["csrow",3,8,12,20],["dbrdl",2,10,10,20,{optional:true,fromWeek:5}],["legext",2,10,15,20],["legcurl",2,10,15,17.5],["calfseat",3,12,15,20],["dbcurl",2,8,12,12.5],["pushdown",2,10,15,null],["deadbug",2,5,5,null]]}
+    A:{title:"Session A",sub:"Squat and press",items:[["ssb",3,6,8,40],["dbpress",3,8,12,15,{ss:"p"}],["pullup",3,5,8,null,{ss:"p"}],["hyper",3,8,12,10],["legext",2,10,15,20,{ss:"l"}],["legcurl",2,10,15,17.5,{ss:"l"}],["pallof",2,8,8,null],["splank",2,20,30,null],["carry",3,30,30,30,{optional:true,fromWeek:5}]]},
+    B:{title:"Session B",sub:"Bench and legs",items:[["goblet",3,8,10,20],["bench",3,6,8,60,{ss:"b"}],["csrow",3,8,12,20,{ss:"b"}],["dbrdl",2,10,10,20,{optional:true,fromWeek:5}],["legext",2,10,15,20,{ss:"l"}],["legcurl",2,10,15,17.5,{ss:"l"}],["calfseat",3,12,15,20],["dbcurl",2,8,12,12.5,{ss:"a"}],["pushdown",2,10,15,null,{ss:"a"}],["deadbug",2,5,5,null]]}
   }},
   2:{label:"Phase 2 · Rebuild",days:4,order:["L1","U1","L2","U2"],sessions:{
-    L1:{title:"Lower 1",sub:"Squat focus",items:[["hatfield",3,6,10,null],["rdl",3,8,10,null],["legext",3,12,15,null],["legcurl",3,10,12,null],["calfstand",3,12,15,null],["suitcase",3,20,20,null]]},
+    L1:{title:"Lower 1",sub:"Squat focus",items:[["hatfield",3,6,10,null],["rdl",3,8,10,null],["legext",3,12,15,null,{ss:"l"}],["legcurl",3,10,12,null,{ss:"l"}],["calfstand",3,12,15,null],["suitcase",3,20,20,null]]},
     U1:{title:"Upper 1",sub:"Bench focus",items:[["bench",4,6,10,null],["csrow",3,10,12,null],["dbpress",3,8,12,null],["pullup",3,6,10,null],["latraise",3,12,15,null],["skull",3,10,12,null]]},
     L2:{title:"Lower 2",sub:"Hinge focus",items:[["trapbar",3,5,6,80],["ssb",3,10,12,null],["hyperw",3,10,15,null],["split",2,8,8,null],["legcurl",2,12,12,null],["pallof",2,8,8,null],["splank",2,20,40,null]]},
     U2:{title:"Upper 2",sub:"Press focus",items:[["swiss",3,6,10,40],["ngpull",3,5,10,null],["incdb",3,8,12,null],["cablerow",3,10,12,null],["facepull",3,15,15,null],["hammer",3,10,12,null],["dips",2,6,10,null,{optional:true,fromWeek:5}]]}
@@ -457,7 +458,7 @@ function viewToday(){
       <div class="seg" aria-label="Choose session">${P.order.map(k=>`<button data-act="pick" data-v="${k}" aria-pressed="${k===key}">${esc(P.sessions[k].title)}</button>`).join("")}</div></div>
       ${light==="red" ? `<div class="banner red"><b>No lifting today.</b> Walk if it's comfortable, do the daily routine, and check again tomorrow.</div>` : ""}
       ${light==="amber" ? `<div class="banner amber">Amber: bar-on-back lifts swapped for goblet squats, carries and hinges dropped, sets halved.</div>` : ""}
-      <ul class="plan">${items.map(it=>{ const sg = suggest(it); const d=EX[it[0]]; return `<li><div><b>${esc(d.name)}</b></div><div class="tgt num">${targetText(it)}${sg.kg!=null?` · ${fmtKg(sg.kg)}kg`:""}</div>${sg.why?`<div class="why">${esc(sg.why)}</div>`:""}</li>`; }).join("")}</ul>
+      <ul class="plan">${items.map(it=>{ const sg = suggest(it); const d=EX[it[0]]; const pr = it[5]&&it[5].ss ? items.find(x=>x!==it && x[5]&&x[5].ss===it[5].ss) : null; return `<li><div><b>${esc(d.name)}</b>${pr?` <span class="chip blue">${items.indexOf(it)<items.indexOf(pr)?"Superset, then":"Superset with"} ${esc(EX[pr[0]].name)}</span>`:""}</div><div class="tgt num">${targetText(it)}${sg.kg!=null?` · ${fmtKg(sg.kg)}kg`:""}</div>${sg.why?`<div class="why">${esc(sg.why)}</div>`:""}</li>`; }).join("")}</ul>
       ${optionals.length ? `<div class="checks">${optionals.map(it=>{ const o=it[5]; const ok = wk >= o.fromWeek; return `<button class="check" data-act="opt" data-v="${it[0]}" aria-pressed="${!!state.optional[it[0]]}" ${ok?"":"disabled"}><span class="box">${state.optional[it[0]]?"✓":""}</span><span><b>Add ${esc(EX[it[0]].name)}</b><br><span class="small muted">${ok ? "Only if the last two weeks' 48-hour checks were clean." : `Unlocks in week ${o.fromWeek}.`}</span></span></button>`; }).join("")}</div>` : ""}
       <div class="row"><button class="btn primary" data-act="start" ${(!light || light==="red" || state.readOnly)?"disabled":""}>Start ${esc(S.title)}</button>${!light?`<span class="small muted">Pick today's light first.</span>`:""}</div>
     </section>`;
@@ -480,7 +481,8 @@ function viewSession(){
     const kgLabel = d.mode==="time" ? "" : (d.unit||"kg");
     const repLabel = d.mode==="time" ? "Seconds" : d.mode==="dist" ? "Metres" : "Reps";
     const showKg = d.mode !== "time";
-    h += `<section class="card" id="ex-${ei}"><div class="ex-head"><div><h3>${esc(d.name)}</h3>${d.note?`<p class="small muted">${esc(d.note)}</p>`:""}</div><div class="ex-tgt num">${esc(e.target)}</div></div>
+    const pi = partnerOf(s, ei); const pe = pi>-1 ? s.exercises[pi] : null;
+    h += `<section class="card ${pe?"ss":""}" id="ex-${ei}"><div class="ex-head"><div>${pe?`<span class="chip blue">${ei<pi?"Superset · go straight to":"Superset · straight after"} ${esc(EX[pe.id].name)}</span>`:""}<h3>${esc(d.name)}</h3>${d.note?`<p class="small muted">${esc(d.note)}</p>`:""}</div><div class="ex-tgt num">${esc(e.target)}</div></div>
       ${e.last?`<p class="small muted num">${esc(e.last)}</p>`:""}${e.why?`<div class="hint ${e.kind||""}">${esc(e.why)}</div>`:""}
       <div class="sets">${e.sets.map((st,si)=>`<div class="set ${st.done?"done":""}" data-e="${ei}" data-s="${si}">
         <span class="n">${si+1}</span>
@@ -579,7 +581,7 @@ function startSession(){
   const phase = state.settings.phase, key = state.pick || nextKey(), S = PHASES[phase].sessions[key];
   const items = sessionItems(phase, key, light);
   const s = { id: t+"-"+uid(), phase, key, title:S.title, sub:S.sub, date:t, week:weekNo(), light, status:"active", startedAt:Date.now(), finishedAt:null, notes:"", endedEarly:null, check:null,
-    exercises: items.map(it=>{ const [id,sets,lo,hi] = it; const sg = suggest(it); return { id, lo, hi, plannedSets:sets, target:targetText(it), last:lastLine(id), why:sg.why, kind:sg.kind,
+    exercises: items.map(it=>{ const [id,sets,lo,hi] = it; const sg = suggest(it); return { id, lo, hi, ss:(it[5]&&it[5].ss)||null, plannedSets:sets, target:targetText(it), last:lastLine(id), why:sg.why, kind:sg.kind,
       sets: Array.from({length:sets},()=>({kg: sg.kg!=null ? fmtKg(sg.kg) : "", reps:"", ph: String(hi), done:false})) }; }) };
   saveSession(s); state.pick = null; state.tab = "session"; render(); window.scrollTo(0,0); wake();
 }
@@ -607,7 +609,7 @@ document.addEventListener("click", e=>{
     st.kg = row.querySelector('[data-f="kg"]')?.value ?? st.kg; st.reps = row.querySelector('[data-f="reps"]').value;
     if (!st.done && st.reps==="" ){ st.reps = st.ph || ""; row.querySelector('[data-f="reps"]').value = st.reps; }
     st.done = !st.done; row.classList.toggle("done", st.done); b.setAttribute("aria-pressed", st.done); saveSession(s);
-    if (st.done){ const ex = s.exercises[row.dataset.e]; const allDone = ex.sets.every(x=>x.done); const nxt = allDone ? s.exercises[+row.dataset.e+1] : ex; startRest(EX[ex.id].rest||90, nxt ? (allDone?"Next: "+EX[nxt.id].name : EX[ex.id].name+", set "+(ex.sets.findIndex(x=>!x.done)+1)) : "Last set done. Finish when ready."); } }
+    if (st.done) afterSet(s, +row.dataset.e, +row.dataset.s); }
   else if (a==="addset" || a==="delset"){ const s = currentSession(); const ex = s.exercises[b.dataset.e]; if (a==="addset"){ const last = ex.sets[ex.sets.length-1]; ex.sets.push({kg:last?last.kg:"",reps:"",ph:last?last.ph:"",done:false}); } else ex.sets.pop(); saveSession(s); const y = window.scrollY; render(); window.scrollTo(0,y); }
   else if (a==="finish") finish(null);
   else if (a==="early") finish(v);
@@ -630,9 +632,32 @@ document.addEventListener("change", e=>{
   else if (el.id==="start" && el.value){ saveSettings({startDate:el.value}); render(); }
 });
 
+function partnerOf(s, ei){ const e = s.exercises[ei]; if (!e || !e.ss) return -1; return s.exercises.findIndex((x,j)=>j!==ei && x.ss===e.ss); }
+function nextAfter(s, ei){ const pi = partnerOf(s, ei); const last = Math.max(ei, pi); return s.exercises[last+1]; }
+function afterSet(s, ei, si){
+  const ex = s.exercises[ei], pi = partnerOf(s, ei);
+  if (pi > -1){
+    const pe = s.exercises[pi], first = ei < pi;
+    const pending = pe.sets.findIndex(x=>!x.done);
+    if (first && pending > -1){
+      startRest(0, `Go: ${EX[pe.id].name}, set ${pending+1}`, true);
+      const el = document.querySelector(`.set[data-e="${pi}"][data-s="${pending}"]`); el?.scrollIntoView({behavior:"smooth", block:"center"});
+      return;
+    }
+    const fe = first ? ex : pe; const fi = first ? ei : pi;
+    const nf = fe.sets.findIndex(x=>!x.done);
+    const rest = Math.max(EX[ex.id].rest||60, EX[pe.id].rest||60);
+    if (nf > -1){ startRest(rest, `Next: ${EX[fe.id].name}, set ${nf+1}`); const el = document.querySelector(`.set[data-e="${fi}"][data-s="${nf}"]`); el?.scrollIntoView({behavior:"smooth", block:"center"}); return; }
+    const pend2 = ex.sets.findIndex(x=>!x.done);
+    if (pend2 > -1){ startRest(rest, `Next: ${EX[ex.id].name}, set ${pend2+1}`); return; }
+    const nx = nextAfter(s, ei); startRest(rest, nx ? "Next: "+EX[nx.id].name : "Last set done. Finish when ready."); return;
+  }
+  const allDone = ex.sets.every(x=>x.done); const nxt = allDone ? s.exercises[ei+1] : ex;
+  startRest(EX[ex.id].rest||90, nxt ? (allDone ? "Next: "+EX[nxt.id].name : EX[ex.id].name+", set "+(ex.sets.findIndex(x=>!x.done)+1)) : "Last set done. Finish when ready.");
+}
 /* ---------- Rest timer + screen awake ---------- */
 let restEnd = 0, restInt = null;
-function startRest(sec,label){ restEnd = Date.now()+sec*1000; $("#rest-label").textContent = label; $("#rest").hidden = false; $("#rest").classList.remove("over"); clearInterval(restInt); tickRest(); restInt = setInterval(tickRest, 250); }
+function startRest(sec,label,go){ restEnd = Date.now()+sec*1000; $("#rest-label").textContent = label; $("#rest").hidden = false; $("#rest").classList.remove("over"); $("#rest .eyebrow").textContent = go ? "Superset" : "Rest"; clearInterval(restInt); tickRest(); restInt = setInterval(tickRest, 250); }
 function tickRest(){ const left = Math.round((restEnd-Date.now())/1000); const a = Math.abs(left); $("#rest-t").textContent = (left<0?"+":"")+Math.floor(a/60)+":"+String(a%60).padStart(2,"0"); $("#rest").classList.toggle("over", left<=0); }
 function stopRest(){ clearInterval(restInt); $("#rest").hidden = true; }
 $("#rest-add").addEventListener("click", ()=>{ restEnd += 30000; tickRest(); });
