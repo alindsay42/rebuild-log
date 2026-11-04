@@ -8,6 +8,9 @@
 <meta name="apple-mobile-web-app-title" content="Rebuild Log">
 <title>Rebuild Log</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231d5cc0'/%3E%3Crect x='8' y='22' width='8' height='20' rx='2' fill='white'/%3E%3Crect x='48' y='22' width='8' height='20' rx='2' fill='white'/%3E%3Crect x='16' y='28' width='32' height='8' fill='white'/%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#1d5cc0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
 <style>
@@ -676,6 +679,7 @@ document.addEventListener("click", e=>{
 });
 document.addEventListener("change", e=>{ if (e.target.id==="restore-file" && e.target.files[0]){ importJson(e.target.files[0]); e.target.value=""; } });
 try { navigator.storage?.persist?.(); } catch {}
+if ("serviceWorker" in navigator && location.protocol === "https:") { navigator.serviceWorker.register("sw.js").catch(()=>{}); }
 
 boot();
 </script>
