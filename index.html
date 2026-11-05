@@ -158,6 +158,19 @@ button.day:disabled{opacity:.35;cursor:default}
 .wform .check{width:auto}
 .swatch{display:inline-block;width:14px;height:10px;background:var(--green-soft);border:1px solid var(--green);vertical-align:middle}
 .stat span{display:block}
+.addhere{display:flex;justify-content:center;margin-block:-10px}
+.addhere .btn{min-height:34px;font-size:13px;color:var(--muted);border:1px dashed var(--line);background:transparent}
+.ex-side{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.card.removed .rm{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:8px}
+.seg.small button{min-height:36px;padding:4px 10px;font-size:13px}
+.picker{position:fixed;inset:0;z-index:30;background:rgba(10,12,15,.55);display:flex;align-items:flex-end;justify-content:center;padding-top:calc(env(safe-area-inset-top,0px) + 24px)}
+.picker .sheet{background:var(--surface);width:min(760px,100%);max-height:100%;border-radius:14px 14px 0 0;padding:16px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:12px}
+.pick-list{overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding-bottom:8px}
+.pgroup{display:flex;flex-direction:column;gap:6px}
+.pick{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:4px 12px;text-align:left;border:1px solid var(--line);background:var(--surface-2);border-radius:8px;padding:12px;min-height:52px;width:100%}
+.pick:disabled{opacity:.5;cursor:default}
+.pick .confirm{flex-basis:100%;font-size:13px;font-weight:600;color:var(--amber)}
+#pick-q{width:100%}
 .legend{display:flex;flex-wrap:wrap;gap:12px;font-size:13px;color:var(--muted)}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .stat{background:var(--surface-2);border-radius:8px;padding:10px 12px}
@@ -245,6 +258,17 @@ const EX = {
   hammer:{name:"EZ or hammer curl",mode:"load",unit:"kg",inc:2.5,rest:60},
   dips:{name:"Dips",mode:"load",unit:"kg added",inc:2.5,rest:90,note:"Knees bent in front, no swinging, no deep stretch at the bottom."}
 };
+const GROUPS = [
+  ["Squat",["ssb","goblet","hatfield"]],
+  ["Hinge and back",["dbrdl","rdl","trapbar","hyper","hyperw"]],
+  ["Push",["bench","dbpress","incdb","swiss","dips"]],
+  ["Pull",["csrow","pullup","ngpull","cablerow","facepull"]],
+  ["Legs",["legext","legcurl","split","calfseat","calfstand"]],
+  ["Shoulders and arms",["latraise","dbcurl","hammer","pushdown","skull"]],
+  ["Core",["pallof","splank","deadbug"]],
+  ["Carry",["carry","suitcase"]]
+];
+const loadsSpine = id => !!(EX[id] && EX[id].amber);
 // item: [exId, sets, lo, hi, startKg, opts]
 const PHASES = {
   1:{label:"Phase 1 · Foundation",days:3,week:["rest","lift","walk","lift","walk","lift","long"],order:["A","B"],sessions:{
@@ -376,7 +400,7 @@ function nextKey(){
 }
 function lastFor(exId){
   for (const s of doneSessions().sort((a,b)=>b.startedAt-a.startedAt)){
-    const e = (s.exercises||[]).find(x=>x.id===exId && (x.sets||[]).some(st=>st.done));
+    const e = (s.exercises||[]).find(x=>x.id===exId && !x.removed && (x.sets||[]).some(st=>st.done));
     if (e) return {session:s, ex:e};
   }
   return null;
@@ -513,13 +537,16 @@ function viewSession(){
   const s = currentSession(); if (!s) return "";
   let h = `<section class="card"><div class="spread"><div><div class="eyebrow">${PHASES[s.phase].label} · Week ${s.week}</div><h2>${esc(s.title)} · ${esc(s.sub)}</h2></div><span class="chip ${s.light}"><span class="dot"></span>${LIGHTS[s.light].label}</span></div>
     <p class="small muted">Stop a set when form changes. One breath per rep. Light-headed, dizzy or sick: end the session.</p></section>`;
+  const addBtn = pos => `<div class="addhere"><button class="btn sm ghost" data-act="add-open" data-v="${pos}">+ Add exercise here</button></div>`;
   s.exercises.forEach((e,ei)=>{
-    const d = EX[e.id];
+    if (e.removed) return;
+    h += addBtn(ei);
+    const d = EX[e.id] || {name:e.id};
     const kgLabel = d.mode==="time" ? "" : (d.unit||"kg");
     const repLabel = d.mode==="time" ? "Seconds" : d.mode==="dist" ? "Metres" : "Reps";
     const showKg = d.mode !== "time";
     const pi = partnerOf(s, ei); const pe = pi>-1 ? s.exercises[pi] : null;
-    h += `<section class="card ${pe?"ss":""}" id="ex-${ei}"><div class="ex-head"><div>${pe?`<span class="chip blue">${ei<pi?"Superset · go straight to":"Superset · straight after"} ${esc(EX[pe.id].name)}</span>`:""}<h3>${esc(d.name)}</h3>${d.note?`<p class="small muted">${esc(d.note)}</p>`:""}</div><div class="ex-tgt num">${esc(e.target)}</div></div>
+    h += `<section class="card ${pe?"ss":""}" id="ex-${ei}"><div class="ex-head"><div>${pe?`<span class="chip blue">${ei<pi?"Superset · go straight to":"Superset · straight after"} ${esc(EX[pe.id].name)}</span>`:""}${e.added?`<span class="chip">Added today</span>`:""}<h3>${esc(d.name)}</h3>${d.note?`<p class="small muted">${esc(d.note)}</p>`:""}</div><div class="ex-side"><div class="ex-tgt num">${esc(e.target)}</div><button class="btn sm ghost danger" data-act="ex-remove" data-e="${ei}">Remove</button></div></div>
       ${e.last?`<p class="small muted num">${esc(e.last)}</p>`:""}${e.why?`<div class="hint ${e.kind||""}">${esc(e.why)}</div>`:""}
       <div class="sets">${e.sets.map((st,si)=>`<div class="set ${st.done?"done":""}" data-e="${ei}" data-s="${si}">
         <span class="n">${si+1}</span>
@@ -528,14 +555,30 @@ function viewSession(){
         <button class="tick" data-act="tick" aria-label="Mark set ${si+1} done" aria-pressed="${st.done}">✓</button></div>`).join("")}</div>
       <div class="row"><button class="btn sm ghost" data-act="addset" data-e="${ei}">+ Add set</button>${e.sets.length>1?`<button class="btn sm ghost" data-act="delset" data-e="${ei}">Remove last set</button>`:""}</div></section>`;
   });
+  h += addBtn(s.exercises.length);
+  const gone = s.exercises.map((e,ei)=>({e,ei})).filter(x=>x.e.removed);
+  if (gone.length) h += `<section class="card removed"><div class="eyebrow">Removed today</div>${gone.map(({e,ei})=>{ const kept = e.sets.filter(x=>x.done).length; return `<div class="rm"><div class="spread"><div><b>${esc(EX[e.id]?.name||e.id)}</b><p class="small muted">${kept ? `${kept} set${kept===1?"":"s"} already done, kept in the log` : "Nothing logged for it"}</p></div><button class="btn sm" data-act="ex-undo" data-e="${ei}">Undo</button></div>
+    <div class="seg small">${RM_REASONS.map(r=>`<button data-act="ex-reason" data-e="${ei}" data-v="${r}" aria-pressed="${e.removed.reason===r}">${r}</button>`).join("")}</div></div>`; }).join("")}</section>`;
   h += `<section class="card"><h2>Finish</h2><label for="notes" class="small muted">Notes: how the back felt, anything odd</label><textarea id="notes">${esc(s.notes||"")}</textarea>
     <div class="row"><button class="btn primary" data-act="finish">Finish session</button></div>
     <div><div class="eyebrow">End early</div><div class="seg">${["Light-headed or sick","Nerve flared","Other"].map(r=>`<button data-act="early" data-v="${r}">${r}</button>`).join("")}</div></div>
     <button class="btn sm ghost danger" data-act="discard" style="align-self:flex-start">Discard this session</button>
     <div id="discard-confirm" hidden class="banner red">Delete this session and everything logged in it? <button class="btn sm danger" data-act="discard-yes">Delete</button> <button class="btn sm" data-act="discard-no">Keep</button></div></section>`;
+  if (state.picker) h += viewPicker(s);
   return h;
 }
 
+const RM_REASONS = ["No equipment","Pain or nerve","Short on time","Other"];
+function viewPicker(s){
+  const live = new Set(s.exercises.filter(e=>!e.removed).map(e=>e.id));
+  const amber = s.light === "amber", conf = state.picker.confirm;
+  return `<div class="picker" role="dialog" aria-modal="true" aria-label="Add an exercise"><div class="sheet">
+    <div class="spread"><h2>Add an exercise</h2><button class="btn sm" data-act="add-close">Close</button></div>
+    <input id="pick-q" class="plain" type="search" placeholder="Search exercises" autocomplete="off">
+    ${amber?`<p class="small banner amber">Amber day: lifts marked "loads spine" need a second tap.</p>`:""}
+    <div class="pick-list">${GROUPS.map(([g,ids])=>`<div class="pgroup"><div class="eyebrow">${g}</div>${ids.filter(id=>EX[id]).map(id=>{ const d=EX[id]; const it=slotFor(id); const inS = live.has(id); const spine = loadsSpine(id);
+      return `<button class="pick" data-act="pick-ex" data-v="${id}" data-name="${esc(d.name.toLowerCase())}" ${inS?"disabled":""}><span><b>${esc(d.name)}</b>${spine?` <span class="chip amber">Loads spine</span>`:""}${inS?` <span class="chip">In this session</span>`:""}</span><span class="small muted num">${targetText(it)}</span>${conf===id?`<span class="confirm">Amber day. Tap again to add anyway.</span>`:""}</button>`; }).join("")}</div>`).join("")}</div></div></div>`;
+}
 function viewProgress(){
   const done = doneSessions();
   const t = todayIso();
@@ -579,7 +622,7 @@ function viewProgress(){
   h += `<section class="card"><div><div class="eyebrow">History</div><h2>Sessions</h2></div>`;
   if (!done.length) h += `<div class="empty">No finished sessions yet. Start one from Today.</div>`;
   else h += `<div class="hist">${done.sort((a,b)=>b.startedAt-a.startedAt).map(s=>`<details><summary><b>${fmtDate(s.date)}</b><span>${esc(s.title)} · ${esc(s.sub)}</span><span class="chip ${s.light}">${LIGHTS[s.light]?.label||""}</span>${s.check?`<span class="chip ${CHECKS[s.check.status].cls}">48h: ${CHECKS[s.check.status].label}</span>`:""}${s.endedEarly?`<span class="chip red">Ended early</span>`:""}<span class="small muted">${s.finishedAt?fmtDur(s.finishedAt-s.startedAt):""}</span></summary>
-      <div class="tablewrap" style="margin-top:8px"><table><tbody>${s.exercises.filter(e=>e.sets.some(x=>x.done)).map(e=>`<tr><td>${esc(EX[e.id]?.name||e.id)}</td><td class="num">${e.sets.filter(x=>x.done).map(x=>`${x.kg!==""&&x.kg!=null?fmtKg(num(x.kg))+"×":""}${x.reps||"–"}`).join(", ")}</td></tr>`).join("")}</tbody></table></div>
+      <div class="tablewrap" style="margin-top:8px"><table><tbody>${s.exercises.filter(e=>e.sets.some(x=>x.done) || e.removed).map(e=>`<tr><td>${esc(EX[e.id]?.name||e.id)}${e.removed?` <span class="chip">Removed${e.removed.reason?": "+esc(e.removed.reason.toLowerCase()):""}</span>`:e.added?` <span class="chip blue">Added</span>`:""}</td><td class="num">${e.sets.filter(x=>x.done).map(x=>`${x.kg!==""&&x.kg!=null?fmtKg(num(x.kg))+"×":""}${x.reps||"–"}`).join(", ")}</td></tr>`).join("")}</tbody></table></div>
       ${s.endedEarly?`<p class="small">Ended early: ${esc(s.endedEarly)}</p>`:""}${s.notes?`<p class="small muted">${esc(s.notes)}</p>`:""}
       ${s.check?"":`<div class="row" style="margin-top:8px"><span class="small muted">48-hour check:</span>${Object.entries(CHECKS).map(([k,c])=>`<button class="btn sm" data-act="check" data-id="${s.id}" data-v="${k}">${c.label}</button>`).join("")}</div>`}
       <div class="row" style="margin-top:8px"><button class="btn sm ghost danger" data-act="del" data-id="${s.id}">Delete session</button><span id="del-${s.id}" hidden class="small">Delete for good? <button class="btn sm danger" data-act="del-yes" data-id="${s.id}">Delete</button></span></div></details>`).join("")}</div>`;
@@ -719,7 +762,7 @@ function dayPanel(dd){
     const ed = state.editing && state.editing.id === s.id ? state.editing.draft : null;
     h += ed ? sessionEditor(ed) : `<article class="log"><div class="spread"><div><h3>${esc(s.title)} · ${esc(s.sub)}</h3><p class="small muted">${new Date(s.startedAt).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})}${s.finishedAt?" · "+fmtDur(s.finishedAt-s.startedAt):""} · ${PHASES[s.phase]?.label||""}, week ${s.week}</p></div>
       <div class="row"><span class="chip ${s.light}">${LIGHTS[s.light]?.label||""}</span>${s.check?`<span class="chip ${CHECKS[s.check.status].cls}">48h: ${CHECKS[s.check.status].label}</span>`:'<span class="chip">48h: not yet</span>'}<button class="btn sm" data-act="edit" data-id="${s.id}">Edit</button></div></div>
-      <ol class="loglist">${s.exercises.map(e=>{ const sets = e.sets.filter(x=>x.done); return `<li class="${sets.length?"":"skipped"}"><b>${esc(EX[e.id]?.name||e.id)}</b><span class="num">${sets.length ? sets.map(x=>setTxt(e,x)).join(" · ") : "Not done"}</span></li>`; }).join("")}</ol>
+      <ol class="loglist">${s.exercises.map(e=>{ const sets = e.sets.filter(x=>x.done); const tag = e.removed ? ` <span class="chip">Removed${e.removed.reason?": "+esc(e.removed.reason.toLowerCase()):""}</span>` : e.added ? ` <span class="chip blue">Added today</span>` : ""; return `<li class="${sets.length?"":"skipped"}"><span><b>${esc(EX[e.id]?.name||e.id)}</b>${tag}</span><span class="num">${sets.length ? sets.map(x=>setTxt(e,x)).join(" · ") : e.removed ? "Removed before any sets" : "Not done"}</span></li>`; }).join("")}</ol>
       ${s.endedEarly?`<p class="small"><b>Ended early:</b> ${esc(s.endedEarly)}</p>`:""}${s.notes?`<p class="small"><b>Notes:</b> ${esc(s.notes)}</p>`:""}</article>`;
   }
   return h + `</section>`;
@@ -772,13 +815,19 @@ function viewSettings(){
 }
 
 /* ---------- Actions ---------- */
+function makeEntry(it){ const [id,sets,lo,hi] = it; const sg = suggest(it); return { id, lo, hi, ss:(it[5]&&it[5].ss)||null, plannedSets:sets, target:targetText(it), last:lastLine(id), why:sg.why, kind:sg.kind,
+  sets: Array.from({length:sets},()=>({kg: sg.kg!=null ? fmtKg(sg.kg) : "", reps:"", ph: String(hi), done:false})) }; }
+function slotFor(id){
+  const order = [state.settings.phase, 1, 2, 3];
+  for (const ph of order){ for (const S of Object.values(PHASES[ph].sessions)){ const it = S.items.find(x=>x[0]===id); if (it) return [id, it[1], it[2], it[3], it[4], {}]; } }
+  return [id, 3, 8, 12, null, {}];
+}
 function startSession(){
   const t = todayIso(), light = day(t).light; if (!light || light==="red") return;
   const phase = state.settings.phase, key = state.pick || nextKey(), S = PHASES[phase].sessions[key];
   const items = sessionItems(phase, key, light);
   const s = { id: t+"-"+uid(), phase, key, title:S.title, sub:S.sub, date:t, week:weekNo(), light, status:"active", startedAt:Date.now(), finishedAt:null, notes:"", endedEarly:null, check:null,
-    exercises: items.map(it=>{ const [id,sets,lo,hi] = it; const sg = suggest(it); return { id, lo, hi, ss:(it[5]&&it[5].ss)||null, plannedSets:sets, target:targetText(it), last:lastLine(id), why:sg.why, kind:sg.kind,
-      sets: Array.from({length:sets},()=>({kg: sg.kg!=null ? fmtKg(sg.kg) : "", reps:"", ph: String(hi), done:false})) }; }) };
+    exercises: items.map(makeEntry) };
   saveSession(s); state.pick = null; state.tab = "session"; render(); window.scrollTo(0,0); wake();
 }
 function finish(early){
@@ -789,6 +838,7 @@ function finish(early){
   state.tab = "today"; render(); window.scrollTo(0,0);
   toast(early ? "Session saved. Rest up, and sit or lie down if you feel unwell." : "Session saved. Check in about 48 hours.");
 }
+document.addEventListener("keydown", e=>{ if (e.key==="Escape" && state.picker){ state.picker=null; render(); } });
 document.addEventListener("click", e=>{
   const nav = e.target.closest("nav.tabs button"); if (nav){ state.tab = nav.dataset.tab; render(); window.scrollTo(0,0); return; }
   const b = e.target.closest("[data-act]"); if (!b || b.disabled) return;
@@ -808,6 +858,14 @@ document.addEventListener("click", e=>{
     if (st.done) afterSet(s, +row.dataset.e, +row.dataset.s); }
   else if (a==="addset" || a==="delset"){ const s = currentSession(); const ex = s.exercises[b.dataset.e]; if (a==="addset"){ const last = ex.sets[ex.sets.length-1]; ex.sets.push({kg:last?last.kg:"",reps:"",ph:last?last.ph:"",done:false}); } else ex.sets.pop(); saveSession(s); const y = window.scrollY; render(); window.scrollTo(0,y); }
   else if (a==="finish") finish(null);
+  else if (a==="ex-remove"){ const s = currentSession(); const e = s.exercises[b.dataset.e]; e.removed = {reason:null, at:Date.now(), sets: JSON.parse(JSON.stringify(e.sets))}; e.sets = e.sets.filter(x=>x.done); saveSession(s); stopRest(); const y = window.scrollY; render(); window.scrollTo(0,y); toast(`Removed ${EX[e.id]?.name||e.id}. Undo is at the bottom.`); }
+  else if (a==="ex-undo"){ const s = currentSession(); const e = s.exercises[b.dataset.e]; const keep = e.sets; e.sets = e.removed.sets.map((x,i)=>x); e.removed = null; delete e.removed; saveSession(s); render(); document.getElementById("ex-"+b.dataset.e)?.scrollIntoView({behavior:"smooth",block:"start"}); }
+  else if (a==="ex-reason"){ const s = currentSession(); const e = s.exercises[b.dataset.e]; e.removed.reason = e.removed.reason===v ? null : v; saveSession(s); const y = window.scrollY; render(); window.scrollTo(0,y); }
+  else if (a==="add-open"){ state.picker = {pos:Number(v), confirm:null}; const y = window.scrollY; render(); window.scrollTo(0,y); setTimeout(()=>$("#pick-q")?.focus({preventScroll:true}),50); }
+  else if (a==="add-close"){ state.picker = null; const y = window.scrollY; render(); window.scrollTo(0,y); }
+  else if (a==="pick-ex"){ const s = currentSession(); if (s.light==="amber" && loadsSpine(v) && state.picker.confirm!==v){ state.picker.confirm = v; const y = window.scrollY; const sc = $(".pick-list")?.scrollTop; render(); window.scrollTo(0,y); if ($(".pick-list")) $(".pick-list").scrollTop = sc||0; return; }
+    const entry = makeEntry(slotFor(v)); entry.added = true; entry.ss = null; const pos = Math.min(state.picker.pos, s.exercises.length); s.exercises.splice(pos, 0, entry); state.picker = null; saveSession(s); render();
+    document.getElementById("ex-"+pos)?.scrollIntoView({behavior:"smooth",block:"start"}); toast(`Added ${EX[v].name}.`); }
   else if (a==="early") finish(v);
   else if (a==="discard") $("#discard-confirm").hidden = false;
   else if (a==="discard-no") $("#discard-confirm").hidden = true;
@@ -836,6 +894,7 @@ document.addEventListener("click", e=>{
 });
 document.addEventListener("input", e=>{
   const el = e.target;
+  if (el.id==="pick-q"){ const q = el.value.trim().toLowerCase(); document.querySelectorAll(".pick").forEach(b=>{ b.hidden = q && !b.dataset.name.includes(q); }); document.querySelectorAll(".pgroup").forEach(g=>{ g.hidden = ![...g.querySelectorAll(".pick")].some(b=>!b.hidden); }); return; }
   if (el.id==="w-kg"){ const n = num(el.value); const lb = document.getElementById("w-lb"); if (lb) lb.textContent = n ? toLb(n)+" lb" : ""; return; }
   if (el.dataset.f){ const row = el.closest(".set"); const s = currentSession(); if (!s) return; s.exercises[row.dataset.e].sets[row.dataset.s][el.dataset.f] = el.value; saveSessionSoon(s); }
   else if (el.dataset.ed && state.editing){ const row = el.closest(".set"); state.editing.draft.exercises[row.dataset.e].sets[row.dataset.s][el.dataset.ed] = el.value; }
@@ -850,8 +909,9 @@ document.addEventListener("change", e=>{
   else if (el.id==="start" && el.value){ saveSettings({startDate:el.value}); render(); }
 });
 
-function partnerOf(s, ei){ const e = s.exercises[ei]; if (!e || !e.ss) return -1; return s.exercises.findIndex((x,j)=>j!==ei && x.ss===e.ss); }
-function nextAfter(s, ei){ const pi = partnerOf(s, ei); const last = Math.max(ei, pi); return s.exercises[last+1]; }
+function partnerOf(s, ei){ const e = s.exercises[ei]; if (!e || !e.ss || e.removed) return -1; return s.exercises.findIndex((x,j)=>j!==ei && x.ss===e.ss && !x.removed); }
+function nextLive(s, from){ for (let j=from; j<s.exercises.length; j++) if (!s.exercises[j].removed) return s.exercises[j]; return null; }
+function nextAfter(s, ei){ const pi = partnerOf(s, ei); const last = Math.max(ei, pi); return nextLive(s, last+1); }
 function afterSet(s, ei, si){
   const ex = s.exercises[ei], pi = partnerOf(s, ei);
   if (pi > -1){
@@ -870,7 +930,7 @@ function afterSet(s, ei, si){
     if (pend2 > -1){ startRest(rest, `Next: ${EX[ex.id].name}, set ${pend2+1}`); return; }
     const nx = nextAfter(s, ei); startRest(rest, nx ? "Next: "+EX[nx.id].name : "Last set done. Finish when ready."); return;
   }
-  const allDone = ex.sets.every(x=>x.done); const nxt = allDone ? s.exercises[ei+1] : ex;
+  const allDone = ex.sets.every(x=>x.done); const nxt = allDone ? nextLive(s, ei+1) : ex;
   startRest(EX[ex.id].rest||90, nxt ? (allDone ? "Next: "+EX[nxt.id].name : EX[ex.id].name+", set "+(ex.sets.findIndex(x=>!x.done)+1)) : "Last set done. Finish when ready.");
 }
 document.addEventListener("submit", e=>{
