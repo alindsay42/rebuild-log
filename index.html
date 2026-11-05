@@ -171,6 +171,11 @@ button.day:disabled{opacity:.35;cursor:default}
 .pick:disabled{opacity:.5;cursor:default}
 .pick .confirm{flex-basis:100%;font-size:13px;font-weight:600;color:var(--amber)}
 #pick-q{width:100%}
+.danger-zone{border-color:var(--red)}
+.erase{display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.erase .field{width:min(280px,100%)}
+.btn.danger-fill{background:var(--red);border-color:var(--red);color:#fff}
+.btn.danger-fill:disabled{opacity:.4;cursor:not-allowed}
 .legend{display:flex;flex-wrap:wrap;gap:12px;font-size:13px;color:var(--muted)}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .stat{background:var(--surface-2);border-radius:8px;padding:10px 12px}
@@ -811,7 +816,13 @@ function viewSettings(){
     <p class="small">Your log is saved in this browser on this device, with no account and no internet needed. Clearing the browser's site data deletes it, so download a backup every few weeks and keep it somewhere safe (Google Drive, email it to yourself).</p>
     <p class="small muted">${doneSessions().length} finished sessions · ${Object.keys(state.days).length} days logged · ${state.settings.lastBackup ? "last backup " + fmtDate(state.settings.lastBackup) : "never backed up"}</p>
     <div class="row"><button class="btn primary" data-x="json">Download backup</button><button class="btn" data-x="csv">Export to spreadsheet (CSV)</button><button class="btn" data-x="restore">Import from file</button><input id="restore-file" type="file" accept=".json,.csv,application/json,text/csv" multiple hidden></div>
-    <p class="small muted">Import takes a backup file or the CSV exports (pick both CSVs at once to bring the days across too) and adds them to what's here. A session with the same date and name is updated rather than doubled, so it's safe to import the same file twice. Send a backup to Claude whenever you want your training reviewed.</p></section>`;
+    <p class="small muted">Import takes a backup file or the CSV exports (pick both CSVs at once to bring the days across too) and adds them to what's here. A session with the same date and name is updated rather than doubled, so it's safe to import the same file twice. Send a backup to Claude whenever you want your training reviewed.</p></section>
+    <section class="card danger-zone"><div><div class="eyebrow">Start again</div><h2>Erase all data</h2></div>
+    <p class="small">Deletes every session, day, walk and weight on this device. Your theme stays. This can't be undone, so download a backup first.</p>
+    ${state.erase ? `<div class="erase"><button class="btn" data-x="json">Download backup first</button>
+      <div class="field"><label for="erase-txt">Type ERASE to confirm</label><input id="erase-txt" class="plain" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
+      <div class="row"><button class="btn danger-fill" data-act="erase-yes" id="erase-btn" disabled>Erase everything</button><button class="btn" data-act="erase-cancel">Cancel</button></div></div>`
+    : `<button class="btn danger" data-act="erase" style="align-self:flex-start">Erase all data…</button>`}</section>`;
 }
 
 /* ---------- Actions ---------- */
@@ -877,6 +888,13 @@ document.addEventListener("click", e=>{
   else if (a==="w-del"){ const el = document.getElementById("wdel-"+v); if (el) el.hidden = false; }
   else if (a==="w-del-yes"){ delete state.weights[v]; lsSave(); render(); toast("Weight deleted."); }
   else if (a==="w-all"){ state.wAll = !state.wAll; render(); }
+  else if (a==="erase"){ state.erase = true; render(); setTimeout(()=>$("#erase-txt")?.focus(),50); }
+  else if (a==="erase-cancel"){ state.erase = false; render(); }
+  else if (a==="erase-yes"){ if ($("#erase-txt")?.value.trim() !== "ERASE") return;
+    const theme = state.settings.theme; stopRest(); release();
+    state.sessions = []; state.days = {}; state.weights = {}; state.settings = {phase:1, startDate:"2026-11-02", theme};
+    state.erase = false; state.editing = null; state.selDay = null; state.progEx = null; state.pick = null; state.picker = null; state.wEdit = null;
+    lsSave(); state.tab = "today"; render(); window.scrollTo(0,0); toast("All data erased."); }
   else if (a==="cal"){ state.calOff = Math.max(-2,(state.calOff||0)+Number(v)); render(); }
   else if (a==="day"){ state.selDay = v; state.editing = null; render(); document.getElementById("daylog")?.scrollIntoView({behavior:"smooth",block:"start"}); }
   else if (a==="daylight"){ const dd = state.selDay||t; saveDay(dd,{light:v}); render(); }
@@ -894,6 +912,7 @@ document.addEventListener("click", e=>{
 });
 document.addEventListener("input", e=>{
   const el = e.target;
+  if (el.id==="erase-txt"){ const btn = $("#erase-btn"); if (btn) btn.disabled = el.value.trim() !== "ERASE"; return; }
   if (el.id==="pick-q"){ const q = el.value.trim().toLowerCase(); document.querySelectorAll(".pick").forEach(b=>{ b.hidden = q && !b.dataset.name.includes(q); }); document.querySelectorAll(".pgroup").forEach(g=>{ g.hidden = ![...g.querySelectorAll(".pick")].some(b=>!b.hidden); }); return; }
   if (el.id==="w-kg"){ const n = num(el.value); const lb = document.getElementById("w-lb"); if (lb) lb.textContent = n ? toLb(n)+" lb" : ""; return; }
   if (el.dataset.f){ const row = el.closest(".set"); const s = currentSession(); if (!s) return; s.exercises[row.dataset.e].sets[row.dataset.s][el.dataset.f] = el.value; saveSessionSoon(s); }
