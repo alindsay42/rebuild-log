@@ -130,6 +130,22 @@ input[type=date],input[type=number].plain,select{border:1px solid var(--line);ba
 .day.green{background:var(--green-soft);border-color:var(--green)} .day.amber{background:var(--amber-soft);border-color:var(--amber)} .day.red{background:var(--red-soft);border-color:var(--red)}
 .day.trained::after{content:"";position:absolute;width:8px;height:8px;border-radius:50%;background:var(--accent);top:4px;right:4px}
 .day.today{outline:2px solid var(--ink);outline-offset:1px}
+.strip.cal{grid-template-columns:repeat(7,minmax(0,1fr))}
+.strip.cal .day{aspect-ratio:auto;height:52px}
+.strip .wd{font-size:11px;font-weight:600;color:var(--muted);text-align:center;letter-spacing:.06em}
+button.day{font:inherit;cursor:pointer;padding:0}
+button.day:disabled{opacity:.35;cursor:default}
+.day.sel{outline:3px solid var(--accent);outline-offset:1px}
+.dayfacts{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end}
+.dayfacts > div{display:flex;flex-direction:column;gap:6px}
+.log{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:10px}
+.log.editing{background:var(--surface-2);border:1px solid var(--accent);border-radius:var(--r);padding:12px}
+.log.editing .set{background:var(--surface)}
+.log.editing .set.done{background:var(--green-soft)}
+.loglist{margin:0;padding:0 0 0 22px;display:flex;flex-direction:column;gap:6px}
+.loglist li{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 12px}
+.loglist li.skipped{color:var(--muted)}
+.edex{display:flex;flex-direction:column;gap:8px}
 .legend{display:flex;flex-wrap:wrap;gap:12px;font-size:13px;color:var(--muted)}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .stat{background:var(--surface-2);border-radius:8px;padding:10px 12px}
@@ -292,6 +308,7 @@ async function pump(path){
   q.busy = false;
 }
 async function removeSession(id){
+  if (state.editing && state.editing.id===id) state.editing = null;
   state.sessions = state.sessions.filter(s=>s.id!==id);
   if (state.mode === "db"){ try { await db.doc("sessions/"+id).delete(); } catch { toast("Couldn't delete that session."); } } else lsSave();
   render();
@@ -502,19 +519,24 @@ function viewSession(){
 function viewProgress(){
   const done = doneSessions();
   const t = todayIso();
-  // 28-day strip
-  const cells = [];
-  for (let i=27;i>=0;i--){ const dd = iso(Date.now()-i*DAY); const dy = day(dd); const trained = done.some(s=>s.date===dd); cells.push(`<div class="day ${dy.light||""} ${trained?"trained":""} ${dd===t?"today":""}" title="${fmtDate(dd)}${dy.walkMin?` · walk ${dy.walkMin} min`:""}"><span class="num">${new Date(dd+"T12:00:00").getDate()}</span></div>`); }
-  // this week (Mon start)
+  // calendar: 4 weeks, Monday first, page back in blocks of 4 weeks
   const now = new Date(t+"T12:00:00"); const dow = (now.getDay()+6)%7; const mon = iso(now.getTime()-dow*DAY);
+  const off = state.calOff || 0;
+  const gridStart = new Date(mon+"T12:00:00").getTime() - (21 + off*28)*DAY;
+  const cells = [];
+  for (let i=0;i<28;i++){ const dd = iso(gridStart+i*DAY); const dy = day(dd); const trained = done.some(s=>s.date===dd); const future = dd > t;
+    cells.push(`<button class="day ${dy.light||""} ${trained?"trained":""} ${dd===t?"today":""} ${dd===state.selDay?"sel":""}" data-act="day" data-v="${dd}" ${future?"disabled":""} aria-label="${fmtDate(dd)}${trained?", trained":""}"><span class="num">${new Date(dd+"T12:00:00").getDate()}</span></button>`); }
+  const rangeLabel = `${fmtDate(iso(gridStart))} – ${fmtDate(iso(gridStart+27*DAY))}`;
   const wkSessions = done.filter(s=>s.date>=mon).length;
   let walk = 0; for (let i=0;i<=dow;i++){ walk += num(day(iso(new Date(mon+"T12:00:00").getTime()+i*DAY)).walkMin) || 0; }
   const last14 = Array.from({length:14},(_,i)=>day(iso(Date.now()-i*DAY)).light).filter(Boolean);
   const greens = last14.filter(x=>x==="green").length;
-  let h = `<section class="card"><div><div class="eyebrow">Last 4 weeks</div><h2>Back and training</h2></div>
-    <div class="strip">${cells.join("")}</div>
-    <div class="legend"><span><span class="dot" style="color:var(--green)"></span> Green</span><span><span class="dot" style="color:var(--amber)"></span> Amber</span><span><span class="dot" style="color:var(--red)"></span> Red</span><span><span class="dot" style="color:var(--accent)"></span> Trained</span></div>
+  let h = `<section class="card"><div class="spread"><div><div class="eyebrow num">${rangeLabel}</div><h2>Back and training</h2></div>
+    <div class="row"><button class="btn sm" data-act="cal" data-v="1" aria-label="Earlier 4 weeks">‹ Earlier</button><button class="btn sm" data-act="cal" data-v="-1" ${off===0?"disabled":""} aria-label="Later 4 weeks">Later ›</button></div></div>
+    <div class="strip cal">${["M","T","W","T","F","S","S"].map(x=>`<span class="wd">${x}</span>`).join("")}${cells.join("")}</div>
+    <div class="legend"><span><span class="dot" style="color:var(--green)"></span> Green</span><span><span class="dot" style="color:var(--amber)"></span> Amber</span><span><span class="dot" style="color:var(--red)"></span> Red</span><span><span class="dot" style="color:var(--accent)"></span> Trained</span><span>Tap a day to see its log</span></div>
     <div class="stats"><div class="stat"><span class="small muted">Sessions this week</span><b>${wkSessions} / ${PHASES[state.settings.phase].days}</b></div><div class="stat"><span class="small muted">Walking this week</span><b>${walk} min</b></div><div class="stat"><span class="small muted">Green days, last 14</span><b>${greens} / ${last14.length||0}</b></div></div></section>`;
+  h += dayPanel(state.selDay || t);
   // exercise chart
   const exIds = [...new Set(done.flatMap(s=>(s.exercises||[]).filter(e=>e.sets.some(x=>x.done)).map(e=>e.id)))].filter(id=>EX[id]);
   if (!exIds.length){
@@ -544,6 +566,37 @@ function viewProgress(){
   return h;
 }
 
+
+const setTxt = (e, x) => { const d = EX[e.id] || {}; const unit = d.mode==="time" ? "s" : d.mode==="dist" ? "m" : ""; const kg = x.kg!==""&&x.kg!=null ? fmtKg(num(x.kg))+"kg × " : ""; return `${kg}${x.reps||"–"}${unit}`; };
+function dayPanel(dd){
+  const dy = day(dd), list = state.sessions.filter(s=>s.date===dd && s.status==="done").sort((a,b)=>a.startedAt-b.startedAt);
+  const r = (dy.routine||[]).filter(Boolean).length;
+  let h = `<section class="card" id="daylog"><div class="spread"><div><div class="eyebrow">Day log</div><h2>${fmtDate(dd)}</h2></div>${dd===todayIso()?'<span class="chip blue">Today</span>':""}</div>
+    <div class="dayfacts"><div><span class="eyebrow">Back</span><div class="seg">${Object.entries(LIGHTS).map(([k,l])=>`<button data-act="daylight" data-v="${k}" aria-pressed="${dy.light===k}">${l.label}</button>`).join("")}</div></div>
+    <div><label class="eyebrow" for="day-walk">Walk (min)</label><input id="day-walk" class="plain num" type="number" inputmode="numeric" min="0" step="5" value="${dy.walkMin ?? ""}" style="width:110px"></div>
+    <div><span class="eyebrow">Routine</span><p class="num">${r} of ${ROUTINE.length} done</p></div></div>`;
+  if (!list.length) h += `<div class="empty">No session logged on this day.</div>`;
+  for (const s of list){
+    const ed = state.editing && state.editing.id === s.id ? state.editing.draft : null;
+    h += ed ? sessionEditor(ed) : `<article class="log"><div class="spread"><div><h3>${esc(s.title)} · ${esc(s.sub)}</h3><p class="small muted">${new Date(s.startedAt).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})}${s.finishedAt?" · "+fmtDur(s.finishedAt-s.startedAt):""} · ${PHASES[s.phase]?.label||""}, week ${s.week}</p></div>
+      <div class="row"><span class="chip ${s.light}">${LIGHTS[s.light]?.label||""}</span>${s.check?`<span class="chip ${CHECKS[s.check.status].cls}">48h: ${CHECKS[s.check.status].label}</span>`:'<span class="chip">48h: not yet</span>'}<button class="btn sm" data-act="edit" data-id="${s.id}">Edit</button></div></div>
+      <ol class="loglist">${s.exercises.map(e=>{ const sets = e.sets.filter(x=>x.done); return `<li class="${sets.length?"":"skipped"}"><b>${esc(EX[e.id]?.name||e.id)}</b><span class="num">${sets.length ? sets.map(x=>setTxt(e,x)).join(" · ") : "Not done"}</span></li>`; }).join("")}</ol>
+      ${s.endedEarly?`<p class="small"><b>Ended early:</b> ${esc(s.endedEarly)}</p>`:""}${s.notes?`<p class="small"><b>Notes:</b> ${esc(s.notes)}</p>`:""}</article>`;
+  }
+  return h + `</section>`;
+}
+function sessionEditor(d){
+  return `<article class="log editing"><div class="spread"><h3>Editing ${esc(d.title)}</h3><div class="row"><button class="btn sm" data-act="ed-cancel">Cancel</button><button class="btn sm primary" data-act="ed-save">Save changes</button></div></div>
+    <div class="row"><span class="eyebrow">Light</span><div class="seg">${Object.entries(LIGHTS).map(([k,l])=>`<button data-act="ed-light" data-v="${k}" aria-pressed="${d.light===k}">${l.label}</button>`).join("")}</div></div>
+    <div class="row"><span class="eyebrow">48-hour check</span><div class="seg">${Object.entries(CHECKS).map(([k,c])=>`<button data-act="ed-check" data-v="${k}" aria-pressed="${d.check?.status===k}">${c.label}</button>`).join("")}<button data-act="ed-check" data-v="" aria-pressed="${!d.check}">Not yet</button></div></div>
+    ${d.exercises.map((e,ei)=>{ const x = EX[e.id]||{}; const showKg = x.mode!=="time"; return `<div class="edex"><b>${esc(x.name||e.id)}</b><div class="sets">${e.sets.map((st,si)=>`<div class="set ${st.done?"done":""}" data-e="${ei}" data-s="${si}"><span class="n">${si+1}</span>
+      ${showKg?`<div class="field"><label for="ekg-${ei}-${si}">${esc(x.unit||"kg")}</label><input id="ekg-${ei}-${si}" data-ed="kg" inputmode="decimal" type="number" step="0.5" min="0" value="${esc(st.kg)}" placeholder="–"></div>`:"<div></div>"}
+      <div class="field"><label for="erp-${ei}-${si}">${x.mode==="time"?"Seconds":x.mode==="dist"?"Metres":"Reps"}</label><input id="erp-${ei}-${si}" data-ed="reps" inputmode="numeric" type="number" step="1" min="0" value="${esc(st.reps)}" placeholder="–"></div>
+      <button class="tick" data-act="ed-tick" aria-label="Set ${si+1} done" aria-pressed="${st.done}">✓</button></div>`).join("")}</div>
+      <div class="row"><button class="btn sm ghost" data-act="ed-addset" data-e="${ei}">+ Add set</button>${e.sets.length>1?`<button class="btn sm ghost" data-act="ed-delset" data-e="${ei}">Remove last set</button>`:""}</div></div>`; }).join("")}
+    <label for="ed-notes" class="small muted">Notes</label><textarea id="ed-notes">${esc(d.notes||"")}</textarea>
+    <div class="row"><button class="btn primary" data-act="ed-save">Save changes</button><button class="btn" data-act="ed-cancel">Cancel</button><button class="btn ghost danger" data-act="del" data-id="${d.id}">Delete session</button><span id="del-${d.id}" hidden class="small">Delete for good? <button class="btn sm danger" data-act="del-yes" data-id="${d.id}">Delete</button></span></div></article>`;
+}
 function chart(dates, vals, label){
   const pts = vals.map((v,i)=>({v,i,d:dates[i]})).filter(p=>p.v!=null);
   if (pts.length < 2) return `<p class="small muted">The chart appears after two sessions with this lift.</p>`;
@@ -617,6 +670,16 @@ document.addEventListener("click", e=>{
   else if (a==="discard-no") $("#discard-confirm").hidden = true;
   else if (a==="discard-yes"){ const s = currentSession(); stopRest(); release(); state.tab="today"; removeSession(s.id); }
   else if (a==="progex"){ state.progEx = v; render(); }
+  else if (a==="cal"){ state.calOff = Math.max(0,(state.calOff||0)+Number(v)); render(); }
+  else if (a==="day"){ state.selDay = v; state.editing = null; render(); document.getElementById("daylog")?.scrollIntoView({behavior:"smooth",block:"start"}); }
+  else if (a==="daylight"){ const dd = state.selDay||t; saveDay(dd,{light:v}); render(); }
+  else if (a==="edit"){ const s = state.sessions.find(x=>x.id===b.dataset.id); if (s){ state.editing = {id:s.id, draft: JSON.parse(JSON.stringify(s))}; const y=window.scrollY; render(); window.scrollTo(0,y); } }
+  else if (a==="ed-cancel"){ state.editing = null; render(); }
+  else if (a==="ed-save"){ const d = state.editing?.draft; if (d){ const n=$("#ed-notes"); if(n) d.notes=n.value; saveSession(d); state.editing=null; render(); toast("Session updated."); } }
+  else if (a==="ed-light"){ state.editing.draft.light = v; const y=window.scrollY; render(); window.scrollTo(0,y); }
+  else if (a==="ed-check"){ state.editing.draft.check = v ? {status:v, at:Date.now()} : null; const y=window.scrollY; render(); window.scrollTo(0,y); }
+  else if (a==="ed-tick"){ const row=b.closest(".set"); const st=state.editing.draft.exercises[row.dataset.e].sets[row.dataset.s]; st.done=!st.done; row.classList.toggle("done",st.done); b.setAttribute("aria-pressed",st.done); }
+  else if (a==="ed-addset"||a==="ed-delset"){ const ex=state.editing.draft.exercises[b.dataset.e]; if(a==="ed-addset"){ const l=ex.sets[ex.sets.length-1]; ex.sets.push({kg:l?l.kg:"",reps:"",ph:l?l.ph:"",done:true}); } else ex.sets.pop(); const y=window.scrollY; render(); window.scrollTo(0,y); }
   else if (a==="del"){ const el = document.getElementById("del-"+b.dataset.id); if (el) el.hidden = false; }
   else if (a==="del-yes") removeSession(b.dataset.id);
   else if (a==="phase"){ saveSettings({phase:Number(v)}); state.pick=null; render(); }
@@ -624,11 +687,14 @@ document.addEventListener("click", e=>{
 document.addEventListener("input", e=>{
   const el = e.target;
   if (el.dataset.f){ const row = el.closest(".set"); const s = currentSession(); if (!s) return; s.exercises[row.dataset.e].sets[row.dataset.s][el.dataset.f] = el.value; saveSessionSoon(s); }
+  else if (el.dataset.ed && state.editing){ const row = el.closest(".set"); state.editing.draft.exercises[row.dataset.e].sets[row.dataset.s][el.dataset.ed] = el.value; }
+  else if (el.id==="ed-notes" && state.editing){ state.editing.draft.notes = el.value; }
   else if (el.id==="notes"){ const s = currentSession(); if (s){ s.notes = el.value; saveSessionSoon(s); } }
 });
 document.addEventListener("change", e=>{
   const el = e.target;
-  if (el.id==="walk"){ const n = num(el.value); saveDay(todayIso(),{walkMin: n==null?null:n}); }
+  if (el.id==="day-walk"){ const n = num(el.value); saveDay(state.selDay||todayIso(),{walkMin: n==null?null:n}); }
+  else if (el.id==="walk"){ const n = num(el.value); saveDay(todayIso(),{walkMin: n==null?null:n}); }
   else if (el.id==="start" && el.value){ saveSettings({startDate:el.value}); render(); }
 });
 
