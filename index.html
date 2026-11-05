@@ -78,6 +78,7 @@ p{margin:0}
 .light{border:2px solid var(--line);background:var(--surface);border-radius:var(--r);padding:12px;text-align:left;display:flex;flex-direction:column;gap:4px;min-height:96px}
 .light b{font-family:var(--display);font-size:22px;text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:8px}
 .light > span{font-size:13px;color:var(--muted);line-height:1.3}
+.light .walk{font-size:14px;font-weight:600;color:var(--ink);margin-top:4px}
 .light.green b{color:var(--green)} .light.amber b{color:var(--amber)} .light.red b{color:var(--red)}
 .light[aria-pressed="true"].green{border-color:var(--green);background:var(--green-soft)}
 .light[aria-pressed="true"].amber{border-color:var(--amber);background:var(--amber-soft)}
@@ -374,7 +375,7 @@ function lastFor(exId){
 function suggest(item){
   const [id,sets,lo,hi,start] = item; const def = EX[id];
   const h = lastFor(id);
-  if (!h) return {kg:start, why: start!=null ? "Starting load from the plan" : (def.mode==="time"||def.mode==="reps") ? "" : "Pick a weight you could lift for 2–3 more reps", kind:""};
+  if (!h) return {kg:start, why: start!=null ? "Starting load from the plan" : (def.mode==="time"||def.mode==="reps") ? "" : def.unit==="kg added" ? "Bodyweight to start. Stop 2–3 reps short of failure" : "Pick a weight you could lift for 2–3 more reps", kind:""};
   const work = h.ex.sets.filter(s=>s.done && num(s.reps)!=null);
   const kgs = work.map(s=>num(s.kg)).filter(v=>v!=null);
   const top = kgs.length ? Math.max(...kgs) : null;
@@ -466,8 +467,13 @@ function viewToday(){
       <p class="small muted">Same: progress next time. Up but settling: repeat loads. Clearly worse, new toe numbness, or knee pain into day 3: Amber plan and one step back.</p></section>`;
   }
   // Light
-  h += `<section class="card"><div class="spread"><div><div class="eyebrow">${fmtDate(t)}</div><h2>How's the back today?</h2></div></div>
-    <div class="lights">${Object.entries(LIGHTS).map(([k,l])=>`<button class="light ${k}" data-act="light" data-v="${k}" aria-pressed="${light===k}"><b><span class="dot"></span>${l.label}</b><span>${l.desc}</span></button>`).join("")}</div></section>`;
+  const tp = plannedFor(t) || {type:"walk"};
+  const dow = new Date(t+"T12:00:00").getDay();
+  const ttype = tp.type==="done" ? P.week[dow] : tp.type;
+  const wtype = ttype==="moved" ? "walk" : ttype==="lift" ? "walk" : ttype;
+  const todayLabel = ttype==="lift" ? `${tp.session ? tp.session.title : "Lifting"} day` : TYPE_LABEL[ttype] || "Walk day";
+  h += `<section class="card"><div class="spread"><div><div class="eyebrow">${fmtDate(t)} · ${esc(todayLabel)}</div><h2>How's the back today?</h2></div>${ttype==="moved"?`<span class="chip">${esc(tp.title)} done early</span>`:""}</div>
+    <div class="lights">${Object.entries(LIGHTS).map(([k,l])=>`<button class="light ${k}" data-act="light" data-v="${k}" aria-pressed="${light===k}"><b><span class="dot"></span>${l.label}</b><span>${l.desc}</span><span class="walk">Walk: ${walkForLight(wk>=1?wk:1, wtype, k)}</span></button>`).join("")}</div></section>`;
   // Session
   if (active){
     h += `<section class="card"><div class="eyebrow">In progress</div><h2>${esc(active.title)} · ${esc(active.sub)}</h2><p class="muted">Started ${new Date(active.startedAt).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})}.</p><div class="row"><button class="btn primary" data-act="tab" data-v="session">Back to session</button></div></section>`;
@@ -475,13 +481,14 @@ function viewToday(){
     const items = light ? sessionItems(phase, key, light) : sessionItems(phase, key, "green");
     const optionals = S.items.filter(i=>i[5] && i[5].optional);
     h += `<section class="card">
-      <div class="spread"><div><div class="eyebrow">${light==="amber"?"Amber version":"Next up"}</div><h2>${esc(S.title)} · ${esc(S.sub)}</h2></div>
+      <div class="spread"><div><div class="eyebrow">${(()=>{ const nd = firstLiftDate(); const lab = ttype==="lift" && tp.type!=="done" ? "Today's session" : nd ? "Next session · planned " + fmtDate(nd) : "Next session"; return light==="amber" ? lab + " · Amber version" : lab; })()}</div><h2>${esc(S.title)} · ${esc(S.sub)}</h2></div>
       <div class="seg" aria-label="Choose session">${P.order.map(k=>`<button data-act="pick" data-v="${k}" aria-pressed="${k===key}">${esc(P.sessions[k].title)}</button>`).join("")}</div></div>
       ${light==="red" ? `<div class="banner red"><b>No lifting today.</b> Walk if it's comfortable, do the daily routine, and check again tomorrow.</div>` : ""}
       ${light==="amber" ? `<div class="banner amber">Amber: bar-on-back lifts swapped for goblet squats, carries and hinges dropped, sets halved.</div>` : ""}
       <ul class="plan">${items.map(it=>{ const sg = suggest(it); const d=EX[it[0]]; const pr = it[5]&&it[5].ss ? items.find(x=>x!==it && x[5]&&x[5].ss===it[5].ss) : null; return `<li><div><b>${esc(d.name)}</b>${pr?` <span class="chip blue">${items.indexOf(it)<items.indexOf(pr)?"Superset, then":"Superset with"} ${esc(EX[pr[0]].name)}</span>`:""}</div><div class="tgt num">${targetText(it)}${sg.kg!=null?` · ${fmtKg(sg.kg)}kg`:""}</div>${sg.why?`<div class="why">${esc(sg.why)}</div>`:""}</li>`; }).join("")}</ul>
       ${optionals.length ? `<div class="checks">${optionals.map(it=>{ const o=it[5]; const ok = wk >= o.fromWeek; return `<button class="check" data-act="opt" data-v="${it[0]}" aria-pressed="${!!state.optional[it[0]]}" ${ok?"":"disabled"}><span class="box">${state.optional[it[0]]?"✓":""}</span><span><b>Add ${esc(EX[it[0]].name)}</b><br><span class="small muted">${ok ? "Only if the last two weeks' 48-hour checks were clean." : `Unlocks in week ${o.fromWeek}.`}</span></span></button>`; }).join("")}</div>` : ""}
-      <div class="row"><button class="btn primary" data-act="start" ${(!light || light==="red" || state.readOnly)?"disabled":""}>Start ${esc(S.title)}</button>${!light?`<span class="small muted">Pick today's light first.</span>`:""}</div>
+      <div class="row"><button class="btn primary" data-act="start" ${(!light || light==="red" || state.readOnly)?"disabled":""}>${ttype==="lift" && tp.type!=="done" ? "Start " + esc(S.title) : "Start " + esc(S.title) + " today instead"}</button>${!light?`<span class="small muted">Pick today's light first.</span>`:""}</div>
+      ${ttype!=="lift" && firstLiftDate() && light && light!=="red" ? `<p class="small muted">Training today moves it forward, so ${fmtDate(firstLiftDate())} becomes a walk day.</p>` : ""}
     </section>`;
   }
   // Daily log
@@ -573,15 +580,42 @@ function viewProgress(){
 
 const setTxt = (e, x) => { const d = EX[e.id] || {}; const unit = d.mode==="time" ? "s" : d.mode==="dist" ? "m" : ""; const kg = x.kg!==""&&x.kg!=null ? fmtKg(num(x.kg))+"kg × " : ""; return `${kg}${x.reps||"–"}${unit}`; };
 function weekNoFor(dd){ const s = new Date(state.settings.startDate+"T00:00:00"); return Math.floor((new Date(dd+"T00:00:00") - s)/(7*DAY)) + 1; }
-function walkTarget(wk){ if (state.settings.phase>1) return "45–60 min"; if (wk<=2) return "20–30 min"; return `${Math.min(45,20+5*(wk-2))}–${Math.min(60,30+5*(wk-2))} min`; }
+function walkRange(wk, type){
+  const base = state.settings.phase>1 ? [45,60] : wk<=2 ? [20,30] : [Math.min(45,20+5*(wk-2)), Math.min(60,30+5*(wk-2))];
+  return type==="long" ? [base[1], base[1]+15] : base;
+}
+const r5 = x => Math.max(10, Math.round(x/5)*5);
+function walkForLight(wk, type, light){
+  if (light==="red") return "Only if comfortable: 10–15 min, flat. Otherwise rest.";
+  if (type==="rest") return light==="amber" ? "Optional, short and easy" : "Optional, easy pace";
+  const [lo,hi] = walkRange(wk, type);
+  if (light==="amber") return `${r5(lo*0.6)}–${r5(hi*0.6)} min, flat and easy`;
+  return `${lo}–${hi} min${type==="long"&&state.settings.phase>1?", ruck on a good day":""}`;
+}
+const TYPE_LABEL = {lift:"Lifting day", walk:"Walk day", long:"Long walk day", rest:"Rest day", moved:"Walk day"};
+function earlySkip(){
+  const P = PHASES[state.settings.phase];
+  const ds = doneSessions().filter(s=>s.phase===state.settings.phase).sort((a,b)=>b.startedAt-a.startedAt);
+  if (!ds.length) return null;
+  const L = ds[0].date; const typeOf = d => P.week[new Date(d+"T12:00:00").getDay()];
+  if (typeOf(L)==="lift") return null;
+  let prevLift = null; for (let k=1;k<8;k++){ const d = iso(new Date(L+"T12:00:00").getTime()-k*DAY); if (typeOf(d)==="lift"){ prevLift = d; break; } }
+  const prevSess = ds.find(x=>x.date<L);
+  const covered = !prevLift || prevLift < state.settings.startDate || (prevSess && prevSess.date >= prevLift);
+  if (!covered) return null; // a make-up for a missed day, so nothing ahead moves
+  for (let k=1;k<=3;k++){ const d = iso(new Date(L+"T12:00:00").getTime()+k*DAY); if (typeOf(d)==="lift") return {date:d, from:L, title:ds[0].title}; }
+  return null;
+}
 // What the plan has for a date from today onwards. Lifting days take the next sessions in order, so a missed or moved session just shifts the rest along.
 function plannedFor(dd){
   const t = todayIso(); if (dd < t) return null;
   const P = PHASES[state.settings.phase]; const order = P.order;
   const trainedToday = doneSessions().some(s=>s.date===t) || !!currentSession();
   let i = order.indexOf(nextKey()); if (i<0) i = 0;
+  const skip = earlySkip();
   for (let ms = new Date(t+"T12:00:00").getTime(); ; ms += DAY){
     const d = iso(ms); const type = P.week[new Date(ms).getDay()];
+    if (skip && d===skip.date && type==="lift" && !(d===t && trainedToday)){ if (d===dd) return {type:"moved", from:skip.from, title:skip.title}; continue; }
     const counts = type==="lift" && !(d===t && trainedToday);
     if (d === dd){ return counts ? {type:"lift", key:order[i % order.length], session:P.sessions[order[i % order.length]]} : {type: (d===t && trainedToday) ? "done" : type}; }
     if (counts) i++;
@@ -594,8 +628,9 @@ function planPreview(dd){
   if (wk < 1) return `<div class="empty">The programme starts ${fmtDate(state.settings.startDate)}.</div>`;
   if (p.type === "done") return `<div class="empty">Today's session is in progress.</div>`;
   if (p.type !== "lift"){
-    const txt = p.type==="walk" ? `<b>Walk day.</b> Walk ${walkTarget(wk)}, plus the daily routine.` : p.type==="long" ? `<b>Long walk.</b> Your longest walk of the week${state.settings.phase>1?", or a ruck walk on a Green day":""}, plus the daily routine.` : `<b>Rest day.</b> Daily routine only.`;
-    return `<div class="plan-day">${deload}<p>${txt}</p></div>`;
+    const head = p.type==="moved" ? `<p><b>No lifting.</b> ${esc(p.title)} was done early on ${fmtDate(p.from)}, so this is a walk day.</p>` : `<p><b>${TYPE_LABEL[p.type]}.</b> ${p.type==="rest"?"Daily routine, and an easy walk if you like.":"Walk, plus the daily routine."}</p>`;
+    const wt = p.type==="moved" ? "walk" : p.type;
+    return `<div class="plan-day">${deload}${head}<ul class="plan">${Object.entries(LIGHTS).map(([k,l])=>`<li><div><span class="chip ${k}"><span class="dot"></span>${l.label}</span></div><div class="tgt num">${walkForLight(wk,wt,k)}</div></li>`).join("")}</ul></div>`;
   }
   const P = PHASES[state.settings.phase], S = p.session;
   const saved = state.optional; state.optional = {}; 
