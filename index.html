@@ -146,6 +146,10 @@ button.day:disabled{opacity:.35;cursor:default}
 .loglist li{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 12px}
 .loglist li.skipped{color:var(--muted)}
 .edex{display:flex;flex-direction:column;gap:8px}
+.day.future{background:transparent;border-style:dashed;color:var(--muted)}
+.day.planned::before{content:"";position:absolute;width:8px;height:8px;border-radius:50%;border:2px solid var(--accent);top:3px;right:3px;box-sizing:border-box}
+.ring{display:inline-block;width:10px;height:10px;border-radius:50%;border:2px solid var(--accent);box-sizing:border-box}
+.plan-day{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:12px}
 .legend{display:flex;flex-wrap:wrap;gap:12px;font-size:13px;color:var(--muted)}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .stat{background:var(--surface-2);border-radius:8px;padding:10px 12px}
@@ -235,17 +239,17 @@ const EX = {
 };
 // item: [exId, sets, lo, hi, startKg, opts]
 const PHASES = {
-  1:{label:"Phase 1 · Foundation",days:3,order:["A","B"],sessions:{
+  1:{label:"Phase 1 · Foundation",days:3,week:["rest","lift","walk","lift","walk","lift","long"],order:["A","B"],sessions:{
     A:{title:"Session A",sub:"Squat and press",items:[["ssb",3,6,8,40],["dbpress",3,8,12,15,{ss:"p"}],["pullup",3,5,8,null,{ss:"p"}],["hyper",3,8,12,10],["legext",2,10,15,20,{ss:"l"}],["legcurl",2,10,15,17.5,{ss:"l"}],["pallof",2,8,8,null],["splank",2,20,30,null],["carry",3,30,30,30,{optional:true,fromWeek:5}]]},
     B:{title:"Session B",sub:"Bench and legs",items:[["goblet",3,8,10,20],["bench",3,6,8,60,{ss:"b"}],["csrow",3,8,12,20,{ss:"b"}],["dbrdl",2,10,10,20,{optional:true,fromWeek:5}],["legext",2,10,15,20,{ss:"l"}],["legcurl",2,10,15,17.5,{ss:"l"}],["calfseat",3,12,15,20],["dbcurl",2,8,12,12.5,{ss:"a"}],["pushdown",2,10,15,null,{ss:"a"}],["deadbug",2,5,5,null]]}
   }},
-  2:{label:"Phase 2 · Rebuild",days:4,order:["L1","U1","L2","U2"],sessions:{
+  2:{label:"Phase 2 · Rebuild",days:4,week:["rest","lift","lift","walk","lift","lift","long"],order:["L1","U1","L2","U2"],sessions:{
     L1:{title:"Lower 1",sub:"Squat focus",items:[["hatfield",3,6,10,null],["rdl",3,8,10,null],["legext",3,12,15,null,{ss:"l"}],["legcurl",3,10,12,null,{ss:"l"}],["calfstand",3,12,15,null],["suitcase",3,20,20,null]]},
     U1:{title:"Upper 1",sub:"Bench focus",items:[["bench",4,6,10,null],["csrow",3,10,12,null],["dbpress",3,8,12,null],["pullup",3,6,10,null],["latraise",3,12,15,null],["skull",3,10,12,null]]},
     L2:{title:"Lower 2",sub:"Hinge focus",items:[["trapbar",3,5,6,80],["ssb",3,10,12,null],["hyperw",3,10,15,null],["split",2,8,8,null],["legcurl",2,12,12,null],["pallof",2,8,8,null],["splank",2,20,40,null]]},
     U2:{title:"Upper 2",sub:"Press focus",items:[["swiss",3,6,10,40],["ngpull",3,5,10,null],["incdb",3,8,12,null],["cablerow",3,10,12,null],["facepull",3,15,15,null],["hammer",3,10,12,null],["dips",2,6,10,null,{optional:true,fromWeek:5}]]}
   }},
-  3:{label:"Phase 3 · Strength",days:4,order:["L1","U1","L2","U2"],sessions:{}}
+  3:{label:"Phase 3 · Strength",days:4,week:["rest","lift","lift","walk","lift","lift","long"],order:["L1","U1","L2","U2"],sessions:{}}
 };
 // Phase 3 = Phase 2 sessions with a top set + back-offs on the first lift
 for (const k of PHASES[2].order){
@@ -524,17 +528,17 @@ function viewProgress(){
   const off = state.calOff || 0;
   const gridStart = new Date(mon+"T12:00:00").getTime() - (21 + off*28)*DAY;
   const cells = [];
-  for (let i=0;i<28;i++){ const dd = iso(gridStart+i*DAY); const dy = day(dd); const trained = done.some(s=>s.date===dd); const future = dd > t;
-    cells.push(`<button class="day ${dy.light||""} ${trained?"trained":""} ${dd===t?"today":""} ${dd===state.selDay?"sel":""}" data-act="day" data-v="${dd}" ${future?"disabled":""} aria-label="${fmtDate(dd)}${trained?", trained":""}"><span class="num">${new Date(dd+"T12:00:00").getDate()}</span></button>`); }
+  for (let i=0;i<28;i++){ const dd = iso(gridStart+i*DAY); const dy = day(dd); const trained = done.some(s=>s.date===dd); const future = dd > t; const plan = (dd >= t && !trained) ? plannedFor(dd) : null;
+    cells.push(`<button class="day ${dy.light||""} ${trained?"trained":""} ${future?"future":""} ${plan&&plan.type==="lift"?"planned":""} ${dd===t?"today":""} ${dd===state.selDay?"sel":""}" data-act="day" data-v="${dd}" aria-label="${fmtDate(dd)}${trained?", trained":""}${plan&&plan.type==="lift"?", planned "+esc(plan.session.title):""}"><span class="num">${new Date(dd+"T12:00:00").getDate()}</span></button>`); }
   const rangeLabel = `${fmtDate(iso(gridStart))} – ${fmtDate(iso(gridStart+27*DAY))}`;
   const wkSessions = done.filter(s=>s.date>=mon).length;
   let walk = 0; for (let i=0;i<=dow;i++){ walk += num(day(iso(new Date(mon+"T12:00:00").getTime()+i*DAY)).walkMin) || 0; }
   const last14 = Array.from({length:14},(_,i)=>day(iso(Date.now()-i*DAY)).light).filter(Boolean);
   const greens = last14.filter(x=>x==="green").length;
   let h = `<section class="card"><div class="spread"><div><div class="eyebrow num">${rangeLabel}</div><h2>Back and training</h2></div>
-    <div class="row"><button class="btn sm" data-act="cal" data-v="1" aria-label="Earlier 4 weeks">‹ Earlier</button><button class="btn sm" data-act="cal" data-v="-1" ${off===0?"disabled":""} aria-label="Later 4 weeks">Later ›</button></div></div>
+    <div class="row"><button class="btn sm" data-act="cal" data-v="1" aria-label="Earlier 4 weeks">‹ Earlier</button><button class="btn sm" data-act="cal" data-v="-1" ${off<=-2?"disabled":""} aria-label="Later 4 weeks">Later ›</button></div></div>
     <div class="strip cal">${["M","T","W","T","F","S","S"].map(x=>`<span class="wd">${x}</span>`).join("")}${cells.join("")}</div>
-    <div class="legend"><span><span class="dot" style="color:var(--green)"></span> Green</span><span><span class="dot" style="color:var(--amber)"></span> Amber</span><span><span class="dot" style="color:var(--red)"></span> Red</span><span><span class="dot" style="color:var(--accent)"></span> Trained</span><span>Tap a day to see its log</span></div>
+    <div class="legend"><span><span class="dot" style="color:var(--green)"></span> Green</span><span><span class="dot" style="color:var(--amber)"></span> Amber</span><span><span class="dot" style="color:var(--red)"></span> Red</span><span><span class="dot" style="color:var(--accent)"></span> Trained</span><span><span class="ring"></span> Planned</span><span>Tap a day to see its log</span></div>
     <div class="stats"><div class="stat"><span class="small muted">Sessions this week</span><b>${wkSessions} / ${PHASES[state.settings.phase].days}</b></div><div class="stat"><span class="small muted">Walking this week</span><b>${walk} min</b></div><div class="stat"><span class="small muted">Green days, last 14</span><b>${greens} / ${last14.length||0}</b></div></div></section>`;
   h += dayPanel(state.selDay || t);
   // exercise chart
@@ -568,14 +572,52 @@ function viewProgress(){
 
 
 const setTxt = (e, x) => { const d = EX[e.id] || {}; const unit = d.mode==="time" ? "s" : d.mode==="dist" ? "m" : ""; const kg = x.kg!==""&&x.kg!=null ? fmtKg(num(x.kg))+"kg × " : ""; return `${kg}${x.reps||"–"}${unit}`; };
+function weekNoFor(dd){ const s = new Date(state.settings.startDate+"T00:00:00"); return Math.floor((new Date(dd+"T00:00:00") - s)/(7*DAY)) + 1; }
+function walkTarget(wk){ if (state.settings.phase>1) return "45–60 min"; if (wk<=2) return "20–30 min"; return `${Math.min(45,20+5*(wk-2))}–${Math.min(60,30+5*(wk-2))} min`; }
+// What the plan has for a date from today onwards. Lifting days take the next sessions in order, so a missed or moved session just shifts the rest along.
+function plannedFor(dd){
+  const t = todayIso(); if (dd < t) return null;
+  const P = PHASES[state.settings.phase]; const order = P.order;
+  const trainedToday = doneSessions().some(s=>s.date===t) || !!currentSession();
+  let i = order.indexOf(nextKey()); if (i<0) i = 0;
+  for (let ms = new Date(t+"T12:00:00").getTime(); ; ms += DAY){
+    const d = iso(ms); const type = P.week[new Date(ms).getDay()];
+    const counts = type==="lift" && !(d===t && trainedToday);
+    if (d === dd){ return counts ? {type:"lift", key:order[i % order.length], session:P.sessions[order[i % order.length]]} : {type: (d===t && trainedToday) ? "done" : type}; }
+    if (counts) i++;
+  }
+}
+function planPreview(dd){
+  const p = plannedFor(dd), wk = weekNoFor(dd), t = todayIso();
+  if (!p) return "";
+  const deload = wk >= 1 && wk % 5 === 0 ? `<div class="banner blue small"><b>Deload week.</b> About 60% of the sets and load.</div>` : "";
+  if (wk < 1) return `<div class="empty">The programme starts ${fmtDate(state.settings.startDate)}.</div>`;
+  if (p.type === "done") return `<div class="empty">Today's session is in progress.</div>`;
+  if (p.type !== "lift"){
+    const txt = p.type==="walk" ? `<b>Walk day.</b> Walk ${walkTarget(wk)}, plus the daily routine.` : p.type==="long" ? `<b>Long walk.</b> Your longest walk of the week${state.settings.phase>1?", or a ruck walk on a Green day":""}, plus the daily routine.` : `<b>Rest day.</b> Daily routine only.`;
+    return `<div class="plan-day">${deload}<p>${txt}</p></div>`;
+  }
+  const P = PHASES[state.settings.phase], S = p.session;
+  const saved = state.optional; state.optional = {}; 
+  const items = sessionItems(state.settings.phase, p.key, "green");
+  state.optional = saved;
+  const opt = S.items.filter(i=>i[5] && i[5].optional && wk >= (i[5].fromWeek||1));
+  const isNext = !doneSessions().some(s=>s.date===t) && dd === firstLiftDate();
+  return `<div class="plan-day">${deload}<div class="spread"><div><div class="eyebrow">Planned · week ${wk}</div><h3>${esc(S.title)} · ${esc(S.sub)}</h3></div>${dd===t?`<button class="btn sm primary" data-act="tab" data-v="today">Go to Today</button>`:""}</div>
+    <ul class="plan">${items.map(it=>{ const d = EX[it[0]]; const sg = suggest(it); const pr = it[5]&&it[5].ss ? items.find(x=>x!==it && x[5]&&x[5].ss===it[5].ss) : null;
+      return `<li><div><b>${esc(d.name)}</b>${pr?` <span class="chip blue">${items.indexOf(it)<items.indexOf(pr)?"Superset, then":"Superset with"} ${esc(EX[pr[0]].name)}</span>`:""}</div><div class="tgt num">${targetText(it)}${sg.kg!=null?` · ${fmtKg(sg.kg)}kg`:""}</div></li>`; }).join("")}
+    ${opt.map(it=>`<li class="off"><div><b>${esc(EX[it[0]].name)}</b> <span class="chip">Optional</span></div><div class="tgt num">${targetText(it)}</div></li>`).join("")}</ul>
+    <p class="small muted">${isNext ? "Weights are today's suggestions." : "Weights shown are where you are now. They update as you log the sessions before this one."} On an Amber day the session changes when you start it.</p></div>`;
+}
+function firstLiftDate(){ const t = todayIso(); for (let k=0;k<14;k++){ const d = iso(new Date(t+"T12:00:00").getTime()+k*DAY); const p = plannedFor(d); if (p && p.type==="lift") return d; } return null; }
 function dayPanel(dd){
   const dy = day(dd), list = state.sessions.filter(s=>s.date===dd && s.status==="done").sort((a,b)=>a.startedAt-b.startedAt);
   const r = (dy.routine||[]).filter(Boolean).length;
-  let h = `<section class="card" id="daylog"><div class="spread"><div><div class="eyebrow">Day log</div><h2>${fmtDate(dd)}</h2></div>${dd===todayIso()?'<span class="chip blue">Today</span>':""}</div>
-    <div class="dayfacts"><div><span class="eyebrow">Back</span><div class="seg">${Object.entries(LIGHTS).map(([k,l])=>`<button data-act="daylight" data-v="${k}" aria-pressed="${dy.light===k}">${l.label}</button>`).join("")}</div></div>
+  let h = `<section class="card" id="daylog"><div class="spread"><div><div class="eyebrow">${dd > todayIso() ? "Coming up" : "Day log"}</div><h2>${fmtDate(dd)}</h2></div>${dd===todayIso()?'<span class="chip blue">Today</span>':dd > todayIso()?`<span class="chip">In ${Math.round((new Date(dd+"T12:00:00")-new Date(todayIso()+"T12:00:00"))/DAY)} day${Math.round((new Date(dd+"T12:00:00")-new Date(todayIso()+"T12:00:00"))/DAY)===1?"":"s"}</span>`:""}</div>
+    ${dd > todayIso() ? "" : `<div class="dayfacts"><div><span class="eyebrow">Back</span><div class="seg">${Object.entries(LIGHTS).map(([k,l])=>`<button data-act="daylight" data-v="${k}" aria-pressed="${dy.light===k}">${l.label}</button>`).join("")}</div></div>
     <div><label class="eyebrow" for="day-walk">Walk (min)</label><input id="day-walk" class="plain num" type="number" inputmode="numeric" min="0" step="5" value="${dy.walkMin ?? ""}" style="width:110px"></div>
-    <div><span class="eyebrow">Routine</span><p class="num">${r} of ${ROUTINE.length} done</p></div></div>`;
-  if (!list.length) h += `<div class="empty">No session logged on this day.</div>`;
+    <div><span class="eyebrow">Routine</span><p class="num">${r} of ${ROUTINE.length} done</p></div></div>`}`;
+  if (!list.length) h += dd >= todayIso() ? planPreview(dd) : `<div class="empty">No session logged on this day.</div>`;
   for (const s of list){
     const ed = state.editing && state.editing.id === s.id ? state.editing.draft : null;
     h += ed ? sessionEditor(ed) : `<article class="log"><div class="spread"><div><h3>${esc(s.title)} · ${esc(s.sub)}</h3><p class="small muted">${new Date(s.startedAt).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})}${s.finishedAt?" · "+fmtDur(s.finishedAt-s.startedAt):""} · ${PHASES[s.phase]?.label||""}, week ${s.week}</p></div>
@@ -624,8 +666,8 @@ function viewSettings(){
     <section class="card"><div><div class="eyebrow">Your data</div><h2>Backup and restore</h2></div>
     <p class="small">Your log is saved in this browser on this device, with no account and no internet needed. Clearing the browser's site data deletes it, so download a backup every few weeks and keep it somewhere safe (Google Drive, email it to yourself).</p>
     <p class="small muted">${doneSessions().length} finished sessions · ${Object.keys(state.days).length} days logged · ${state.settings.lastBackup ? "last backup " + fmtDate(state.settings.lastBackup) : "never backed up"}</p>
-    <div class="row"><button class="btn primary" data-x="json">Download backup</button><button class="btn" data-x="csv">Export to spreadsheet (CSV)</button><button class="btn" data-x="restore">Restore from backup</button><input id="restore-file" type="file" accept="application/json,.json" hidden></div>
-    <p class="small muted">The backup file restores everything here or on a new device. Send it to Claude whenever you want your training reviewed. Restoring replaces what's on this device.</p></section>`;
+    <div class="row"><button class="btn primary" data-x="json">Download backup</button><button class="btn" data-x="csv">Export to spreadsheet (CSV)</button><button class="btn" data-x="restore">Import from file</button><input id="restore-file" type="file" accept=".json,.csv,application/json,text/csv" multiple hidden></div>
+    <p class="small muted">Import takes a backup file or the CSV exports (pick both CSVs at once to bring the days across too) and adds them to what's here. A session with the same date and name is updated rather than doubled, so it's safe to import the same file twice. Send a backup to Claude whenever you want your training reviewed.</p></section>`;
 }
 
 /* ---------- Actions ---------- */
@@ -670,7 +712,7 @@ document.addEventListener("click", e=>{
   else if (a==="discard-no") $("#discard-confirm").hidden = true;
   else if (a==="discard-yes"){ const s = currentSession(); stopRest(); release(); state.tab="today"; removeSession(s.id); }
   else if (a==="progex"){ state.progEx = v; render(); }
-  else if (a==="cal"){ state.calOff = Math.max(0,(state.calOff||0)+Number(v)); render(); }
+  else if (a==="cal"){ state.calOff = Math.max(-2,(state.calOff||0)+Number(v)); render(); }
   else if (a==="day"){ state.selDay = v; state.editing = null; render(); document.getElementById("daylog")?.scrollIntoView({behavior:"smooth",block:"start"}); }
   else if (a==="daylight"){ const dd = state.selDay||t; saveDay(dd,{light:v}); render(); }
   else if (a==="edit"){ const s = state.sessions.find(x=>x.id===b.dataset.id); if (s){ state.editing = {id:s.id, draft: JSON.parse(JSON.stringify(s))}; const y=window.scrollY; render(); window.scrollTo(0,y); } }
@@ -746,22 +788,85 @@ function exportJson(){
 }
 function exportCsv(){
   const q = v => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s; };
-  const rows = [["date","session","phase","week","light","check_48h","exercise","set","kg","reps","done","ended_early","notes"]];
-  doneSessions().sort((a,b)=>a.startedAt-b.startedAt).forEach(s=>s.exercises.forEach(e=>e.sets.forEach((st,i)=>rows.push([s.date,s.title,s.phase,s.week,s.light,s.check?.status||"",EX[e.id]?.name||e.id,i+1,st.kg,st.reps,st.done?"yes":"no",s.endedEarly||"",i===0&&e===s.exercises[0]?s.notes:""]))));
+  const rows = [["date","session","phase","week","light","check_48h","exercise","set","kg","reps","done","ended_early","notes","session_id","exercise_id","started_at","finished_at"]];
+  doneSessions().sort((a,b)=>a.startedAt-b.startedAt).forEach(s=>s.exercises.forEach(e=>e.sets.forEach((st,i)=>rows.push([s.date,s.title,s.phase,s.week,s.light,s.check?.status||"",EX[e.id]?.name||e.id,i+1,st.kg,st.reps,st.done?"yes":"no",s.endedEarly||"",i===0&&e===s.exercises[0]?s.notes:"",s.id,e.id,s.startedAt,s.finishedAt||""]))));
   const days = [["date","light","walk_min","routine_items_done"]];
   Object.values(state.days).sort((a,b)=>a.date<b.date?-1:1).forEach(d=>days.push([d.date,d.light||"",d.walkMin??"",(d.routine||[]).filter(Boolean).length]));
   download(`rebuild-log-sets-${todayIso()}.csv`, rows.map(r=>r.map(q).join(",")).join("\n"), "text/csv");
   setTimeout(()=>download(`rebuild-log-days-${todayIso()}.csv`, days.map(r=>r.map(q).join(",")).join("\n"), "text/csv"), 600);
 }
-async function importJson(file){
+function parseCsv(text){
+  text = text.replace(/^﻿/,"");
+  const rows=[]; let row=[], f="", q=false;
+  for (let i=0;i<text.length;i++){ const c=text[i];
+    if (q){ if (c==='"'){ if (text[i+1]==='"'){ f+='"'; i++; } else q=false; } else f+=c; }
+    else if (c==='"') q=true;
+    else if (c===','){ row.push(f); f=""; }
+    else if (c==='\n'||c==='\r'){ if (c==='\r'&&text[i+1]==='\n') i++; row.push(f); rows.push(row); row=[]; f=""; }
+    else f+=c; }
+  if (f!==""||row.length){ row.push(f); rows.push(row); }
+  return rows.filter(r=>r.some(x=>x!==""));
+}
+function mergeSession(imp, tally){
+  const i = state.sessions.findIndex(x=>x.id===imp.id || (x.date===imp.date && x.title===imp.title && x.status==="done"));
+  if (i>-1){ imp.id = state.sessions[i].id; state.sessions[i] = imp; tally.updated++; } else { state.sessions.push(imp); tally.added++; }
+}
+function mergeDay(d, patch){ state.days[d] = {...(state.days[d]||{}), ...patch, date:d}; }
+function importCsvText(text, tally){
+  const rows = parseCsv(text); if (rows.length<2) return;
+  const H = rows[0].map(x=>x.trim().toLowerCase()); const col = n => H.indexOf(n);
+  const get = (r,n) => { const k=col(n); return k>-1 ? (r[k]??"").trim() : ""; };
+  if (col("walk_min")>-1){
+    rows.slice(1).forEach(r=>{ const d=get(r,"date"); if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return; const p={};
+      if (get(r,"light")) p.light=get(r,"light"); const w=num(get(r,"walk_min")); if (w!=null) p.walkMin=w;
+      const n=num(get(r,"routine_items_done")); if (n!=null) p.routine=ROUTINE.map((_,i)=>i<n);
+      mergeDay(d,p); tally.days++; });
+    return;
+  }
+  if (col("exercise")<0 || col("date")<0) throw new Error("bad");
+  const byName = {}; Object.entries(EX).forEach(([k,v])=>byName[v.name.toLowerCase()]=k);
+  const groups = new Map();
+  rows.slice(1).forEach((r,ri)=>{ const d=get(r,"date"); if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+    const key = get(r,"session_id") || d+"|"+get(r,"session");
+    if (!groups.has(key)) groups.set(key,{rows:[],order:ri}); groups.get(key).rows.push(r); });
+  for (const [key,g] of groups){
+    const r0 = g.rows[0]; const phase = num(get(r0,"phase")) || 1; const title = get(r0,"session");
+    const P = PHASES[phase] || PHASES[1]; const k = Object.keys(P.sessions).find(x=>P.sessions[x].title===title) || null;
+    const S = k ? P.sessions[k] : null; const date = get(r0,"date");
+    const started = num(get(r0,"started_at")) || (new Date(date+"T12:00:00").getTime() + g.order);
+    const chk = get(r0,"check_48h");
+    const sess = { id: get(r0,"session_id") || date+"-"+uid(), phase, key:k, title, sub: S?S.sub:"", date, week: num(get(r0,"week"))||1,
+      light: get(r0,"light")||"green", status:"done", startedAt: started, finishedAt: num(get(r0,"finished_at")) || started,
+      notes: g.rows.map(r=>get(r,"notes")).filter(Boolean).join(" "), endedEarly: get(r0,"ended_early")||null,
+      check: CHECKS[chk] ? {status:chk, at:started} : null, exercises: [] };
+    const exMap = new Map();
+    g.rows.forEach(r=>{ const id = get(r,"exercise_id") || byName[get(r,"exercise").toLowerCase()] || get(r,"exercise");
+      if (!exMap.has(id)){ const it = S ? S.items.find(x=>x[0]===id) : null;
+        exMap.set(id,{ id, lo: it?it[2]:null, hi: it?it[3]:null, ss: it&&it[5]&&it[5].ss || null, plannedSets: it?it[1]:null, target: it?targetText(it):"", sets:[] }); }
+      exMap.get(id).sets.push({ kg:get(r,"kg"), reps:get(r,"reps"), ph:"", done: /^(yes|true|1)$/i.test(get(r,"done")) }); });
+    sess.exercises = [...exMap.values()];
+    mergeSession(sess, tally);
+  }
+}
+async function importFiles(files){
+  const tally = {added:0, updated:0, days:0};
   try {
-    const data = JSON.parse(await file.text());
-    if (data.app !== "rebuild-log" || !data.sessions) throw new Error("bad");
-    state.sessions = Object.values(data.sessions).sort((a,b)=>b.startedAt-a.startedAt);
-    state.days = data.days || {};
-    state.settings = {...state.settings, ...(data.settings||{}), lastBackup: (data.exportedAt||"").slice(0,10) || state.settings.lastBackup};
-    lsSave(); render(); toast(`Restored ${doneSessions().length} sessions.`);
-  } catch { toast("That file isn't a Rebuild Log backup."); }
+    for (const file of files){
+      const text = await file.text();
+      if (/^\s*\{/.test(text)){
+        const data = JSON.parse(text);
+        if (data.app !== "rebuild-log" || !data.sessions) throw new Error("bad");
+        const hadNone = !state.sessions.length;
+        Object.values(data.sessions).forEach(x=>mergeSession(x, tally));
+        Object.entries(data.days||{}).forEach(([d,v])=>{ mergeDay(d,v); tally.days++; });
+        if (hadNone && data.settings) state.settings = {...state.settings, ...data.settings};
+        state.settings.lastBackup = (data.exportedAt||"").slice(0,10) || state.settings.lastBackup;
+      } else importCsvText(text, tally);
+    }
+    state.sessions.sort((a,b)=>b.startedAt-a.startedAt);
+    lsSave(); render();
+    toast(`Imported: ${tally.added} new session${tally.added===1?"":"s"}, ${tally.updated} updated${tally.days?`, ${tally.days} days`:""}.`);
+  } catch { lsSave(); render(); toast("That file isn't a Rebuild Log backup or CSV export."); }
 }
 document.addEventListener("click", e=>{
   const b = e.target.closest("[data-x]"); if (!b) return;
@@ -769,7 +874,7 @@ document.addEventListener("click", e=>{
   else if (b.dataset.x==="csv") exportCsv();
   else if (b.dataset.x==="restore") $("#restore-file").click();
 });
-document.addEventListener("change", e=>{ if (e.target.id==="restore-file" && e.target.files[0]){ importJson(e.target.files[0]); e.target.value=""; } });
+document.addEventListener("change", e=>{ if (e.target.id==="restore-file" && e.target.files.length){ importFiles([...e.target.files]); e.target.value=""; } });
 try { navigator.storage?.persist?.(); } catch {}
 if ("serviceWorker" in navigator && location.protocol === "https:") { navigator.serviceWorker.register("sw.js").catch(()=>{}); }
 
