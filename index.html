@@ -11,6 +11,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="theme-color" content="#1d5cc0">
+<script>try{var t=(JSON.parse(localStorage.getItem("rebuild-log-v1"))||{}).settings;t=t&&t.theme;if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
 <style>
@@ -321,6 +322,7 @@ async function removeSession(id){
 function saveSession(s){ const i = state.sessions.findIndex(x=>x.id===s.id); if (i<0) state.sessions.unshift(s); else state.sessions[i]=s; write("sessions/"+s.id, s); }
 let sessTimer = null;
 function saveSessionSoon(s){ clearTimeout(sessTimer); sessTimer = setTimeout(()=>saveSession(s), 700); }
+function applyTheme(){ const t = state.settings.theme; const r = document.documentElement; if (t==="dark"||t==="light") r.setAttribute("data-theme", t); else r.removeAttribute("data-theme"); }
 function day(d){ return state.days[d] || {}; }
 function saveDay(d, patch){ state.days[d] = {...day(d), ...patch, date:d}; write("days/"+d, state.days[d]); }
 function saveSettings(patch){ state.settings = {...state.settings, ...patch}; write("settings/main", state.settings); }
@@ -331,7 +333,7 @@ async function boot(){
   if (local.sessions) state.sessions = Object.values(local.sessions).sort((a,b)=>b.startedAt-a.startedAt);
   if (local.days) state.days = local.days;
   if (local.settings) state.settings = {...state.settings, ...local.settings};
-  state.loaded = true; render();
+  state.loaded = true; applyTheme(); render();
   let got = null;
   try { got = window.claude && window.claude.use ? await window.claude.use("db") : null; } catch { got = null; }
   if (!got) return;
@@ -419,7 +421,7 @@ function sessionItems(phase, key, light){
     if (light === "amber"){
       const a = EX[it[0]].amber;
       if (a === "skip") continue;
-      if (a && a.to){ if (S.items.some(x=>x[0]===a.to) || out.some(x=>x[0]===a.to)) continue; item = [a.to, it[1], EX[a.to]===EX.goblet?8:it[2], EX[a.to]===EX.goblet?10:it[3], null, {}]; }
+      if (a && a.to){ if (S.items.some(x=>x[0]===a.to) || out.some(x=>x[0]===a.to)) continue; item = [a.to, it[1], EX[a.to]===EX.goblet?8:it[2], EX[a.to]===EX.goblet?10:it[3], (Object.values(P.sessions).flatMap(x=>x.items).find(x=>x[0]===a.to)||[])[4] ?? null, {}]; }
       item[1] = Math.max(1, Math.ceil(item[1]/2));
     }
     out.push(item);
@@ -694,7 +696,11 @@ function chart(dates, vals, label){
 function viewSettings(){
   const ph = state.settings.phase;
   const gates = {1:"Move on after 4 weeks with no flare lasting past 48 hours, SSB squat 3×8 at 60kg, hyperextension 3×10 at 20kg, and a 45-minute walk with no symptom rise.",2:"Move on after 8 mostly Green weeks, RDL 3×8 at 90kg, trap bar 3×6 at 120kg from high handles, and rotation stage 3 passed.",3:"No max singles before July 2027. Lower handles and straight-bar deadlifts each need 6 Green weeks first."};
-  return `<section class="card"><div><div class="eyebrow">Programme</div><h2>Phase and start date</h2></div>
+  const th = state.settings.theme || "system";
+  return `<section class="card"><div><div class="eyebrow">Display</div><h2>Appearance</h2></div>
+    <div class="seg">${[["system","Match device"],["light","Light"],["dark","Dark"]].map(([k,l])=>`<button data-act="theme" data-v="${k}" aria-pressed="${th===k}">${l}</button>`).join("")}</div>
+    <p class="small muted">Dark is easier on the eyes in the evening. Match device follows the tablet's own setting.</p></section>
+    <section class="card"><div><div class="eyebrow">Programme</div><h2>Phase and start date</h2></div>
     <div class="seg">${[1,2,3].map(p=>`<button data-act="phase" data-v="${p}" aria-pressed="${p===ph}">${PHASES[p].label}</button>`).join("")}</div>
     <div class="banner blue small">${gates[ph]}</div>
     <div class="row"><label for="start" class="small muted">Programme start (week 1)</label><input id="start" type="date" value="${esc(state.settings.startDate)}"></div></section>
@@ -759,6 +765,7 @@ document.addEventListener("click", e=>{
   else if (a==="ed-addset"||a==="ed-delset"){ const ex=state.editing.draft.exercises[b.dataset.e]; if(a==="ed-addset"){ const l=ex.sets[ex.sets.length-1]; ex.sets.push({kg:l?l.kg:"",reps:"",ph:l?l.ph:"",done:true}); } else ex.sets.pop(); const y=window.scrollY; render(); window.scrollTo(0,y); }
   else if (a==="del"){ const el = document.getElementById("del-"+b.dataset.id); if (el) el.hidden = false; }
   else if (a==="del-yes") removeSession(b.dataset.id);
+  else if (a==="theme"){ saveSettings({theme:v}); applyTheme(); render(); }
   else if (a==="phase"){ saveSettings({phase:Number(v)}); state.pick=null; render(); }
 });
 document.addEventListener("input", e=>{
