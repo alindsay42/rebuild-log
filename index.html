@@ -772,8 +772,14 @@ function dayPanel(dd){
   }
   return h + `</section>`;
 }
+function editDirty(){
+  const e = state.editing; if (!e) return false;
+  const norm = o => JSON.stringify({...o, notes: o.notes || ""});
+  return norm(e.draft) !== norm(JSON.parse(e.orig));
+}
+function syncSave(){ const on = editDirty(); document.querySelectorAll('[data-act="ed-save"]').forEach(b=>b.disabled = !on); }
 function sessionEditor(d){
-  return `<article class="log editing"><div class="spread"><h3>Editing ${esc(d.title)}</h3><div class="row"><button class="btn sm" data-act="ed-cancel">Cancel</button><button class="btn sm primary" data-act="ed-save">Save changes</button></div></div>
+  return `<article class="log editing"><div class="spread"><h3>Editing ${esc(d.title)}</h3><div class="row"><button class="btn sm" data-act="ed-cancel">Cancel</button><button class="btn sm primary" data-act="ed-save" ${editDirty()?"":"disabled"}>Save changes</button></div></div>
     <div class="row"><span class="eyebrow">Light</span><div class="seg">${Object.entries(LIGHTS).map(([k,l])=>`<button data-act="ed-light" data-v="${k}" aria-pressed="${d.light===k}">${l.label}</button>`).join("")}</div></div>
     <div class="row"><span class="eyebrow">48-hour check</span><div class="seg">${Object.entries(CHECKS).map(([k,c])=>`<button data-act="ed-check" data-v="${k}" aria-pressed="${d.check?.status===k}">${c.label}</button>`).join("")}<button data-act="ed-check" data-v="" aria-pressed="${!d.check}">Not yet</button></div></div>
     ${d.exercises.map((e,ei)=>{ const x = EX[e.id]||{}; const showKg = x.mode!=="time"; return `<div class="edex"><b>${esc(x.name||e.id)}</b><div class="sets">${e.sets.map((st,si)=>`<div class="set ${st.done?"done":""}" data-e="${ei}" data-s="${si}"><span class="n">${si+1}</span>
@@ -782,7 +788,7 @@ function sessionEditor(d){
       <button class="tick" data-act="ed-tick" aria-label="Set ${si+1} done" aria-pressed="${st.done}">✓</button></div>`).join("")}</div>
       <div class="row"><button class="btn sm ghost" data-act="ed-addset" data-e="${ei}">+ Add set</button>${e.sets.length>1?`<button class="btn sm ghost" data-act="ed-delset" data-e="${ei}">Remove last set</button>`:""}</div></div>`; }).join("")}
     <label for="ed-notes" class="small muted">Notes</label><textarea id="ed-notes">${esc(d.notes||"")}</textarea>
-    <div class="row"><button class="btn primary" data-act="ed-save">Save changes</button><button class="btn" data-act="ed-cancel">Cancel</button><button class="btn ghost danger" data-act="del" data-id="${d.id}">Delete session</button><span id="del-${d.id}" hidden class="small">Delete for good? <button class="btn sm danger" data-act="del-yes" data-id="${d.id}">Delete</button></span></div></article>`;
+    <div class="row"><button class="btn primary" data-act="ed-save" ${editDirty()?"":"disabled"}>Save changes</button><button class="btn" data-act="ed-cancel">Cancel</button><button class="btn ghost danger" data-act="del" data-id="${d.id}">Delete session</button><span id="del-${d.id}" hidden class="small">Delete for good? <button class="btn sm danger" data-act="del-yes" data-id="${d.id}">Delete</button></span></div></article>`;
 }
 function chart(dates, vals, label){
   const pts = vals.map((v,i)=>({v,i,d:dates[i]})).filter(p=>p.v!=null);
@@ -898,12 +904,12 @@ document.addEventListener("click", e=>{
   else if (a==="cal"){ state.calOff = Math.max(-2,(state.calOff||0)+Number(v)); render(); }
   else if (a==="day"){ state.selDay = v; state.editing = null; render(); document.getElementById("daylog")?.scrollIntoView({behavior:"smooth",block:"start"}); }
   else if (a==="daylight"){ const dd = state.selDay||t; saveDay(dd,{light:v}); render(); }
-  else if (a==="edit"){ const s = state.sessions.find(x=>x.id===b.dataset.id); if (s){ state.editing = {id:s.id, draft: JSON.parse(JSON.stringify(s))}; const y=window.scrollY; render(); window.scrollTo(0,y); } }
+  else if (a==="edit"){ const s = state.sessions.find(x=>x.id===b.dataset.id); if (s){ state.editing = {id:s.id, draft: JSON.parse(JSON.stringify(s)), orig: JSON.stringify(s)}; const y=window.scrollY; render(); window.scrollTo(0,y); } }
   else if (a==="ed-cancel"){ state.editing = null; render(); }
-  else if (a==="ed-save"){ const d = state.editing?.draft; if (d){ const n=$("#ed-notes"); if(n) d.notes=n.value; saveSession(d); state.editing=null; render(); toast("Session updated."); } }
+  else if (a==="ed-save"){ const d = state.editing?.draft; if (d && editDirty()){ const n=$("#ed-notes"); if(n) d.notes=n.value; saveSession(d); state.editing=null; render(); toast("Session updated."); } }
   else if (a==="ed-light"){ state.editing.draft.light = v; const y=window.scrollY; render(); window.scrollTo(0,y); }
-  else if (a==="ed-check"){ state.editing.draft.check = v ? {status:v, at:Date.now()} : null; const y=window.scrollY; render(); window.scrollTo(0,y); }
-  else if (a==="ed-tick"){ const row=b.closest(".set"); const st=state.editing.draft.exercises[row.dataset.e].sets[row.dataset.s]; st.done=!st.done; row.classList.toggle("done",st.done); b.setAttribute("aria-pressed",st.done); }
+  else if (a==="ed-check"){ const o = JSON.parse(state.editing.orig).check; state.editing.draft.check = v ? (o && o.status===v ? o : {status:v, at:Date.now()}) : null; const y=window.scrollY; render(); window.scrollTo(0,y); }
+  else if (a==="ed-tick"){ const row=b.closest(".set"); const st=state.editing.draft.exercises[row.dataset.e].sets[row.dataset.s]; st.done=!st.done; row.classList.toggle("done",st.done); b.setAttribute("aria-pressed",st.done); syncSave(); }
   else if (a==="ed-addset"||a==="ed-delset"){ const ex=state.editing.draft.exercises[b.dataset.e]; if(a==="ed-addset"){ const l=ex.sets[ex.sets.length-1]; ex.sets.push({kg:l?l.kg:"",reps:"",ph:l?l.ph:"",done:true}); } else ex.sets.pop(); const y=window.scrollY; render(); window.scrollTo(0,y); }
   else if (a==="del"){ const el = document.getElementById("del-"+b.dataset.id); if (el) el.hidden = false; }
   else if (a==="del-yes") removeSession(b.dataset.id);
@@ -916,8 +922,8 @@ document.addEventListener("input", e=>{
   if (el.id==="pick-q"){ const q = el.value.trim().toLowerCase(); document.querySelectorAll(".pick").forEach(b=>{ b.hidden = q && !b.dataset.name.includes(q); }); document.querySelectorAll(".pgroup").forEach(g=>{ g.hidden = ![...g.querySelectorAll(".pick")].some(b=>!b.hidden); }); return; }
   if (el.id==="w-kg"){ const n = num(el.value); const lb = document.getElementById("w-lb"); if (lb) lb.textContent = n ? toLb(n)+" lb" : ""; return; }
   if (el.dataset.f){ const row = el.closest(".set"); const s = currentSession(); if (!s) return; s.exercises[row.dataset.e].sets[row.dataset.s][el.dataset.f] = el.value; saveSessionSoon(s); }
-  else if (el.dataset.ed && state.editing){ const row = el.closest(".set"); state.editing.draft.exercises[row.dataset.e].sets[row.dataset.s][el.dataset.ed] = el.value; }
-  else if (el.id==="ed-notes" && state.editing){ state.editing.draft.notes = el.value; }
+  else if (el.dataset.ed && state.editing){ const row = el.closest(".set"); state.editing.draft.exercises[row.dataset.e].sets[row.dataset.s][el.dataset.ed] = el.value; syncSave(); }
+  else if (el.id==="ed-notes" && state.editing){ state.editing.draft.notes = el.value; syncSave(); }
   else if (el.id==="notes"){ const s = currentSession(); if (s){ s.notes = el.value; saveSessionSoon(s); } }
 });
 document.addEventListener("change", e=>{
