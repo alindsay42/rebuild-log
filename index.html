@@ -227,7 +227,7 @@ th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
 /* ---------- Programme ---------- */
 // mode: "load" (kg + reps), "reps" (reps only, optional kg), "time" (seconds), "dist" (metres + kg)
 const EX = {
-  ssb:{name:"SSB squat, heels raised",mode:"load",unit:"kg",inc:5,rest:150,note:"Heels on 5–10kg plates. As deep as you can without butt wink. Safety arms set.",amber:{to:"goblet"}},
+  ssb:{name:"SSB squat, heels raised",mode:"load",unit:"kg total",inc:5,rest:150,note:"Total weight including the 32kg bar. Heels on 5–10kg plates. As deep as you can without butt wink. Safety arms set.",amber:{to:"goblet"}},
   dbpress:{name:"Seated DB shoulder press",mode:"load",unit:"kg each",inc:2.5,rest:120,note:"Bench upright, back on the pad, no arching off it. Superset with pull-ups in Session A."},
   csrow:{name:"Chest-supported DB row",mode:"load",unit:"kg each",inc:2.5,rest:90,note:"ABX on incline, straight after the bench. Feet planted, chest stays on the pad, squeeze at the top."},
   hyper:{name:"Back hyperextension",mode:"load",unit:"kg",inc:2.5,rest:90,note:"Straight legs. Stop at a straight line, not past it. 2-second hold at the top."},
@@ -236,7 +236,7 @@ const EX = {
   splank:{name:"Side plank",mode:"time",each:"each side",rest:45,note:"Knees, then feet when easy."},
   carry:{name:"Farmer's carry",mode:"dist",unit:"kg each",inc:2.5,rest:90,note:"Green days only. Tall, slow steps.",amber:"skip"},
   goblet:{name:"Goblet squat to box",mode:"load",unit:"kg DB",inc:2.5,rest:120,note:"3 seconds down. Front-loaded, easy on the spine."},
-  bench:{name:"Flat barbell bench",mode:"load",unit:"kg",inc:2.5,rest:150,note:"Little or no arch. Feet flat or up on the bench. Safeties set."},
+  bench:{name:"Flat barbell bench",mode:"load",unit:"kg total",inc:2.5,rest:150,note:"Little or no arch. Feet flat or up on the bench. Safeties set."},
   pulldown:{name:"Seated pulldown / assisted pull-up",mode:"load",unit:"kg",inc:2.5,rest:90,note:"Sit on the bench under the pulley. Not kneeling."},
   legext:{name:"Leg extension (ABX)",mode:"load",unit:"kg",inc:2.5,rest:30,note:"Superset with leg curl: extension, then curl, then rest."},
   calfseat:{name:"Seated DB calf raise",mode:"load",unit:"kg",inc:2.5,rest:60,note:"S1 drives the calf. Note any left–right difference."},
@@ -244,7 +244,7 @@ const EX = {
   pushdown:{name:"Cable triceps pushdown",mode:"load",unit:"kg",inc:2.5,rest:60},
   deadbug:{name:"Dead bug",mode:"reps",each:"each side",rest:45,note:"Slow. Low back stays flat on the floor."},
   dbrdl:{name:"DB Romanian deadlift",mode:"load",unit:"kg each",inc:2.5,rest:120,note:"Lower to just below the knee. Only if the last two weeks' 48-hour checks were clean.",amber:"skip"},
-  hatfield:{name:"Hatfield squat (SSB, hands on safeties)",mode:"load",unit:"kg",inc:5,rest:150,amber:{to:"goblet"}},
+  hatfield:{name:"Hatfield squat (SSB, hands on safeties)",mode:"load",unit:"kg total",inc:5,rest:150,amber:{to:"goblet"}},
   rdl:{name:"Romanian deadlift",mode:"load",unit:"kg",inc:5,rest:150,note:"DBs until 30kg each, then barbell from 60kg. Just below the knee.",amber:"skip"},
   calfstand:{name:"Standing calf raise",mode:"load",unit:"kg",inc:2.5,rest:60,note:"Stop short of full pointed toes if the left ankle pops."},
   suitcase:{name:"Suitcase carry",mode:"dist",unit:"kg",inc:2.5,rest:60,each:"each side",note:"Stand tall, don't lean away.",amber:"skip"},
@@ -252,10 +252,10 @@ const EX = {
   dbcurl:{name:"DB curl",mode:"load",unit:"kg each",inc:2.5,rest:30,note:"Superset with pushdowns. Stop if the right elbow or bicep complains."},
   latraise:{name:"DB lateral raise",mode:"load",unit:"kg each",inc:1,rest:60},
   skull:{name:"EZ skull crusher",mode:"load",unit:"kg",inc:2.5,rest:60},
-  trapbar:{name:"Trap bar deadlift, high handles",mode:"load",unit:"kg",inc:5,rest:180,note:"RPE 7. No singles. Raise the bar if the bottom rounds.",amber:"skip"},
+  trapbar:{name:"Trap bar deadlift, high handles",mode:"load",unit:"kg total",inc:5,rest:180,note:"Total weight including the 25kg bar. RPE 7. No singles. Raise the bar if the bottom rounds.",amber:"skip"},
   hyperw:{name:"Weighted back hyperextension",mode:"load",unit:"kg",inc:2.5,rest:90},
   split:{name:"Split squat, holding the rack",mode:"load",unit:"kg",each:"each leg",inc:2.5,rest:90,note:"Short range, rear knee off the floor. Drop it if the left knee or nerve objects.",amber:"skip"},
-  swiss:{name:"Standing Swiss bar press",mode:"load",unit:"kg",inc:2.5,rest:150,note:"Strict. Glutes squeezed, no lean back.",amber:{to:"dbpress"}},
+  swiss:{name:"Standing Swiss bar press",mode:"load",unit:"kg total",inc:2.5,rest:150,note:"Strict. Glutes squeezed, no lean back.",amber:{to:"dbpress"}},
   ngpull:{name:"Neutral-grip pull-ups",mode:"load",unit:"kg added",inc:2.5,rest:120,note:"Stop 2 reps short of failure."},
   incdb:{name:"Incline DB press",mode:"load",unit:"kg each",inc:2.5,rest:90},
   cablerow:{name:"Seated cable row",mode:"load",unit:"kg",inc:2.5,rest:90},
@@ -277,7 +277,7 @@ const loadsSpine = id => !!(EX[id] && EX[id].amber);
 // item: [exId, sets, lo, hi, startKg, opts]
 const PHASES = {
   1:{label:"Phase 1 · Foundation",days:3,week:["rest","lift","walk","lift","walk","lift","long"],order:["A","B"],sessions:{
-    A:{title:"Session A",sub:"Squat and press",items:[["ssb",3,6,8,40],["dbpress",3,8,12,15,{ss:"p"}],["pullup",3,5,8,null,{ss:"p"}],["hyper",3,8,12,10],["legext",2,10,15,20,{ss:"l"}],["legcurl",2,10,15,17.5,{ss:"l"}],["pallof",2,8,8,null],["splank",2,20,30,null],["carry",3,30,30,30,{optional:true,fromWeek:5}]]},
+    A:{title:"Session A",sub:"Squat and press",items:[["ssb",3,6,8,52],["dbpress",3,8,12,15,{ss:"p"}],["pullup",3,5,8,null,{ss:"p"}],["hyper",3,8,12,10],["legext",2,10,15,20,{ss:"l"}],["legcurl",2,10,15,17.5,{ss:"l"}],["pallof",2,8,8,null],["splank",2,20,30,null],["carry",3,30,30,30,{optional:true,fromWeek:5}]]},
     B:{title:"Session B",sub:"Bench and legs",items:[["goblet",3,8,10,20],["bench",3,6,8,60,{ss:"b"}],["csrow",3,8,12,20,{ss:"b"}],["dbrdl",2,10,10,20,{optional:true,fromWeek:5}],["legext",2,10,15,20,{ss:"l"}],["legcurl",2,10,15,17.5,{ss:"l"}],["calfseat",3,12,15,20],["dbcurl",2,8,12,12.5,{ss:"a"}],["pushdown",2,10,15,null,{ss:"a"}],["deadbug",2,5,5,null]]}
   }},
   2:{label:"Phase 2 · Rebuild",days:4,week:["rest","lift","lift","walk","lift","lift","long"],order:["L1","U1","L2","U2"],sessions:{
